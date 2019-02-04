@@ -1,0 +1,27 @@
+notests *default:
+  build:
+    target: Vostok.ClusterConfig.Client.sln
+    configuration: NoTests
+    tool:
+      name: dotnet
+
+  install:
+    - Vostok.ClusterConfig.Client/bin/Release/netstandard2.0/Vostok.ClusterConfig.Client.dll
+    - module vostok.clusterconfig.client.abstractions
+
+  deps:
+    - vostok.devtools
+    - vostok.logging.abstractions
+    - vostok.clusterclient.core
+    - vostok.clusterclient.transport
+    - vostok.configuration.abstractions
+    - vostok.configuration.sources
+    - vostok.clusterconfig.client.abstractions
+
+full-build > notests:
+  deps:
+    - vostok.logging.console
+
+  build:
+    target: Vostok.ClusterConfig.Client.sln
+    configuration: Release
