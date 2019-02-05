@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 using JetBrains.Annotations;
 using Vostok.ClusterConfig.Client.Abstractions;
 using Vostok.ClusterConfig.Client.Helpers;
+using Vostok.ClusterConfig.Client.Updaters;
+using Vostok.Commons.Collections;
 using Vostok.Commons.Threading;
 using Vostok.Configuration.Abstractions.Merging;
 using Vostok.Configuration.Abstractions.SettingsTree;
@@ -13,9 +15,9 @@ namespace Vostok.ClusterConfig.Client
 {
     // TODO(iloktionov): threading for observables
 
-    // TODO(iloktionov): "warmness" of ClusterConfigClientSettings: do we need it?
-
     // TODO(iloktionov): Dispose() should probably wait for periodic updater completion
+
+    // TODO(iloktionov): ForContext() for logger
 
     /// <inheritdoc cref="IClusterConfigClient"/>
     [PublicAPI]
@@ -33,24 +35,24 @@ namespace Vostok.ClusterConfig.Client
             ArrayMergeStyle = ArrayMergeStyle.Replace
         };
 
-        private readonly Func<ClusterConfigClientSettings> settingsProvider;
+        private readonly ClusterConfigClientSettings settings;
         private readonly CancellationTokenSource cancellationSource;
         private readonly AtomicInt clientState;
 
         private TaskCompletionSource<ClusterConfigClientState> stateSource;
         private ReplayObservable<ClusterConfigClientState> stateObservable;
 
-        public ClusterConfigClient([NotNull] Func<ClusterConfigClientSettings> settingsProvider)
+        public ClusterConfigClient([NotNull] ClusterConfigClientSettings settings)
         {
-            this.settingsProvider = settingsProvider ?? throw new ArgumentNullException(nameof(settingsProvider));
+            this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
 
-            stateSource = new TaskCompletionSource<ClusterConfigClientState>();
+            stateSource = new TaskCompletionSource<ClusterConfigClientState>(TaskCreationOptions.RunContinuationsAsynchronously);
             stateObservable = new ReplayObservable<ClusterConfigClientState>();
             clientState = new AtomicInt(State_NotStarted);
         }
 
         public ClusterConfigClient()
-            : this(() => DefaultSettings)
+            : this(DefaultSettings)
         {
         }
 
@@ -84,10 +86,7 @@ namespace Vostok.ClusterConfig.Client
             {
                 cancellationSource.Cancel();
 
-                var disposedError = new ObjectDisposedException(GetType().Name);
-
-                if (stateSource.TrySetException(disposedError))
-                    stateObservable.Error(disposedError);
+                PropagateError(new ObjectDisposedException(GetType().Name));
             }
         }
 
@@ -134,16 +133,100 @@ namespace Vostok.ClusterConfig.Client
 
             if (clientState.TrySet(State_Started, State_NotStarted))
             {
-                Task.Run(() => PeriodicUpdatesLoop(cancellationSource.Token));
+                using (ExecutionContext.SuppressFlow())
+                {
+                    Task.Run(() => PeriodicUpdatesLoop(cancellationSource.Token));
+                }
             }
         }
 
         private async Task PeriodicUpdatesLoop(CancellationToken cancellationToken)
         {
-            while (true)
+            var localUpdater = CreateLocalUpdater();
+            var remoteUpdater = CreateRemoteUpdater();
+
+            var lastLocalResult = null as LocalUpdateResult;
+            var lastRemoteResult = null as RemoteUpdateResult;
+
+            while (!cancellationToken.IsCancellationRequested)
             {
-                await Task.Delay(1000).ConfigureAwait(false);
+                var currentState = GetCurrentState();
+
+                try
+                {
+                    var localUpdateResult = localUpdater.Update(lastLocalResult);
+                    var remoteUpdateResult = await remoteUpdater.UpdateAsync(lastRemoteResult, cancellationToken).ConfigureAwait(false);
+
+                    if (currentState == null || localUpdateResult.Changed || remoteUpdateResult.Changed)
+                    {
+                        PropagateNewState(CreateNewState(currentState, localUpdateResult, remoteUpdateResult));
+                    }
+
+                    lastLocalResult = localUpdateResult;
+                    lastRemoteResult = remoteUpdateResult;
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+                catch (Exception error)
+                {
+                    // TODO(iloktionov): log the exception
+
+                    if (currentState == null)
+                        PropagateError(new ClusterConfigClientException("Failure in initial settings update.", error));
+                }
+
+                // TODO(iloktionov): factor in iteration length
+                await Task.Delay(settings.UpdatePeriod, cancellationToken).ConfigureAwait(false);
             }
+        }
+
+        private LocalUpdater CreateLocalUpdater()
+            => throw new NotImplementedException();
+
+        private RemoteUpdater CreateRemoteUpdater()
+            => throw new NotImplementedException();
+
+        [CanBeNull]
+        private ClusterConfigClientState GetCurrentState()
+            => stateSource.Task.Status == TaskStatus.RanToCompletion ? stateSource.Task.Result : null;
+
+        [NotNull]
+        private ClusterConfigClientState CreateNewState(
+            [CanBeNull] ClusterConfigClientState oldState,
+            [NotNull] LocalUpdateResult localUpdateResult,
+            [NotNull] RemoteUpdateResult remoteUpdateResult)
+        {
+            var newLocalTree = localUpdateResult.Changed ? localUpdateResult.Tree : oldState?.LocalTree;
+            var newRemoteTree = remoteUpdateResult.Changed ? remoteUpdateResult.Tree : oldState?.RemoteTree;
+            var newCaches = new RecyclingBoundedCache<ClusterConfigPath, ISettingsNode>(settings.CacheCapacity);
+            var newVersion = (oldState?.Version ?? 0L) + 1;
+
+            return new ClusterConfigClientState(newLocalTree, newRemoteTree, newCaches, newVersion);
+        }
+
+        private void PropagateNewState([NotNull] ClusterConfigClientState state)
+        {
+            if (!stateSource.TrySetResult(state))
+            {
+                var newStateSource = new TaskCompletionSource<ClusterConfigClientState>();
+
+                newStateSource.SetResult(state);
+
+                Interlocked.Exchange(ref stateSource, newStateSource);
+            }
+
+            if (stateObservable.IsCompleted)
+                Interlocked.Exchange(ref stateObservable, new ReplayObservable<ClusterConfigClientState>());
+
+            stateObservable.Next(state);
+        }
+
+        private void PropagateError([NotNull] Exception error)
+        {
+            if (stateSource.TrySetException(error))
+                stateObservable.Error(error);
         }
     }
 }
