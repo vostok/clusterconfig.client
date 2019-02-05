@@ -1,11 +1,12 @@
-﻿using JetBrains.Annotations;
+﻿using System;
+using JetBrains.Annotations;
 using Vostok.ClusterConfig.Client.Helpers;
 
 namespace Vostok.ClusterConfig.Client.Updaters
 {
     internal class RemoteUpdateResult
     {
-        public RemoteUpdateResult(bool changed, [CanBeNull] RemoteTree tree, [NotNull] string version)
+        public RemoteUpdateResult(bool changed, [CanBeNull] RemoteTree tree, DateTime version)
         {
             Changed = changed;
             Tree = tree;
@@ -17,7 +18,6 @@ namespace Vostok.ClusterConfig.Client.Updaters
         [CanBeNull]
         public RemoteTree Tree { get; }
 
-        [NotNull]
-        public string Version { get; }
+        public DateTime Version { get; }
     }
 }
