@@ -28,7 +28,14 @@ namespace Vostok.ClusterConfig.Client.Helpers
                 savedValue = value;
 
                 foreach (var observer in observers)
-                    observer.OnNext(value);
+                    try
+                    {
+                        observer.OnNext(value);
+                    }
+                    catch
+                    {
+                        // ignored
+                    }
             }
         }
 
@@ -45,7 +52,14 @@ namespace Vostok.ClusterConfig.Client.Helpers
                 savedError = error;
 
                 foreach (var observer in observers)
-                    observer.OnError(error);
+                    try
+                    {
+                        observer.OnError(error);
+                    }
+                    catch
+                    {
+                        // ignored
+                    }
 
                 observers.Clear();
             }
