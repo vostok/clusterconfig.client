@@ -4,7 +4,7 @@ using JetBrains.Annotations;
 
 namespace Vostok.ClusterConfig.Client.Helpers
 {
-    internal class ReplayObservable<T> : IObservable<T>
+    internal class CachingObservable<T> : IObservable<T>
         where T : class
     {
         private readonly List<IObserver<T>> observers = new List<IObserver<T>>();
@@ -88,10 +88,10 @@ namespace Vostok.ClusterConfig.Client.Helpers
 
         private class Subscription : IDisposable
         {
-            private readonly ReplayObservable<T> observable;
+            private readonly CachingObservable<T> observable;
             private readonly IObserver<T> observer;
 
-            public Subscription(ReplayObservable<T> observable, IObserver<T> observer)
+            public Subscription(CachingObservable<T> observable, IObserver<T> observer)
             {
                 this.observable = observable;
                 this.observer = observer;
