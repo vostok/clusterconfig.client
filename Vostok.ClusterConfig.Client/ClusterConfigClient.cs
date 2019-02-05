@@ -5,6 +5,7 @@ using JetBrains.Annotations;
 using Vostok.ClusterConfig.Client.Abstractions;
 using Vostok.ClusterConfig.Client.Helpers;
 using Vostok.ClusterConfig.Client.Updaters;
+using Vostok.ClusterConfig.Core.Parsers;
 using Vostok.Commons.Collections;
 using Vostok.Commons.Threading;
 using Vostok.Commons.Time;
@@ -190,7 +191,20 @@ namespace Vostok.ClusterConfig.Client
         }
 
         private LocalUpdater CreateLocalUpdater()
-            => throw new NotImplementedException();
+        {
+            var fileParserSettings = new FileParserSettings
+            {
+                MaximumFileSize = settings.MaximumFileSize
+            };
+
+            var fileParser = new FileParser(fileParserSettings);
+
+            var zoneParser = new ZoneParser(fileParser);
+
+            var localFolder = FolderLocator.Locate(settings.LocalFolder, 3);
+
+            return new LocalUpdater(settings.EnableLocalSettings, localFolder, zoneParser);
+        }
 
         private RemoteUpdater CreateRemoteUpdater()
             => throw new NotImplementedException();
