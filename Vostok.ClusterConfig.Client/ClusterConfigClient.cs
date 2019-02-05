@@ -167,12 +167,11 @@ namespace Vostok.ClusterConfig.Client
                     lastLocalResult = localUpdateResult;
                     lastRemoteResult = remoteUpdateResult;
                 }
-                catch (OperationCanceledException)
-                {
-                    return;
-                }
                 catch (Exception error)
                 {
+                    if (cancellationToken.IsCancellationRequested)
+                        return;
+
                     log.Warn(error, "Periodical settings update has failed.");
 
                     if (currentState == null)
