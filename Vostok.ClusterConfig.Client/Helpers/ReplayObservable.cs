@@ -13,6 +13,8 @@ namespace Vostok.ClusterConfig.Client.Helpers
         private volatile T savedValue;
         private Exception savedError;
 
+        public bool IsCompleted => savedError != null;
+
         public void Next([NotNull] T value)
         {
             if (value == null)
@@ -20,7 +22,7 @@ namespace Vostok.ClusterConfig.Client.Helpers
 
             lock (sync)
             {
-                if (savedError != null)
+                if (IsCompleted)
                     return;
 
                 savedValue = value;
@@ -37,7 +39,7 @@ namespace Vostok.ClusterConfig.Client.Helpers
 
             lock (sync)
             {
-                if (savedError != null)
+                if (IsCompleted)
                     return;
 
                 savedError = error;
@@ -96,7 +98,9 @@ namespace Vostok.ClusterConfig.Client.Helpers
 
         private class EmptyDisposable : IDisposable
         {
-            public void Dispose() { }
+            public void Dispose()
+            {
+            }
         }
 
         #endregion
