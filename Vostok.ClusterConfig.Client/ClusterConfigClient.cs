@@ -7,6 +7,7 @@ using Vostok.ClusterConfig.Client.Helpers;
 using Vostok.ClusterConfig.Client.Updaters;
 using Vostok.Commons.Collections;
 using Vostok.Commons.Threading;
+using Vostok.Commons.Time;
 using Vostok.Configuration.Abstractions.Merging;
 using Vostok.Configuration.Abstractions.SettingsTree;
 using Vostok.Configuration.Sources.Extensions.Observable;
@@ -158,6 +159,8 @@ namespace Vostok.ClusterConfig.Client
             {
                 var currentState = GetCurrentState();
 
+                var budget = TimeBudget.StartNew(settings.UpdatePeriod);
+
                 try
                 {
                     var localUpdateResult = localUpdater.Update(lastLocalResult);
@@ -182,8 +185,7 @@ namespace Vostok.ClusterConfig.Client
                         PropagateError(new ClusterConfigClientException("Failure in initial settings update.", error));
                 }
 
-                // TODO(iloktionov): factor in iteration length
-                await Task.Delay(settings.UpdatePeriod, cancellationToken).ConfigureAwait(false);
+                await Task.Delay(budget.Remaining, cancellationToken).ConfigureAwait(false);
             }
         }
 
