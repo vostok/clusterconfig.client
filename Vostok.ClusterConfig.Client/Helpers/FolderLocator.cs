@@ -1,12 +1,10 @@
 ﻿using System;
 using System.IO;
-using JetBrains.Annotations;
 
 namespace Vostok.ClusterConfig.Client.Helpers
 {
     internal static class FolderLocator
     {
-        [CanBeNull]
         public static DirectoryInfo Locate(string relativePath, int maxOutwardHops)
         {
             var baseDirectory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);

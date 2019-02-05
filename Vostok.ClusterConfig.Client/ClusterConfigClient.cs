@@ -156,6 +156,16 @@ namespace Vostok.ClusterConfig.Client
             var lastLocalResult = null as LocalUpdateResult;
             var lastRemoteResult = null as RemoteUpdateResult;
 
+            log.Info(
+                "Starting updates for zone {Zone} with period {Period}. " +
+                "Local settings enabled = {EnableLocalSettings} (folder = {LocalFolder}). " +
+                "Cluster settings enabled = {EnableClusterSettings}.",
+                settings.Zone,
+                settings.UpdatePeriod,
+                settings.EnableLocalSettings,
+                settings.LocalFolder,
+                settings.EnableClusterSettings);
+
             while (!cancellationToken.IsCancellationRequested)
             {
                 var currentState = GetCurrentState();
@@ -202,6 +212,9 @@ namespace Vostok.ClusterConfig.Client
             var zoneParser = new ZoneParser(fileParser);
 
             var localFolder = FolderLocator.Locate(settings.LocalFolder, 3);
+
+            if (settings.EnableLocalSettings)
+                log.Info("Resolved local settings directory path to '{LocalFolder}'.", localFolder.FullName);
 
             return new LocalUpdater(settings.EnableLocalSettings, localFolder, zoneParser);
         }
