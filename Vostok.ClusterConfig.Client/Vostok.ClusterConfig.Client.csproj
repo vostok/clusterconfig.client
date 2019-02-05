@@ -56,5 +56,7 @@
       <HintPath>..\..\vostok.logging.abstractions\Vostok.Logging.Abstractions\bin\Release\netstandard2.0\Vostok.Logging.Abstractions.dll</HintPath>
     </Reference>
   </ItemGroup>
-  
+
+  <Import Project="..\..\vostok.clusterconfig.core\Vostok.ClusterConfig.Core.props" />
+
 </Project>

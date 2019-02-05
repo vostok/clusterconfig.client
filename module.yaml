@@ -17,6 +17,7 @@ notests *default:
     - vostok.configuration.abstractions
     - vostok.configuration.sources
     - vostok.clusterconfig.client.abstractions
+    - vostok.clusterconfig.core/src
 
 full-build > notests:
   deps:
