@@ -42,7 +42,7 @@ namespace Vostok.ClusterConfig.Client
         private readonly object observablePropagationLock;
 
         private TaskCompletionSource<ClusterConfigClientState> stateSource;
-        private ReplayObservable<ClusterConfigClientState> stateObservable;
+        private CachingObservable<ClusterConfigClientState> stateObservable;
 
         public ClusterConfigClient([NotNull] ClusterConfigClientSettings settings)
         {
@@ -51,7 +51,7 @@ namespace Vostok.ClusterConfig.Client
             log = settings.Log.ForContext<ClusterConfigClient>();
 
             stateSource = new TaskCompletionSource<ClusterConfigClientState>(TaskCreationOptions.RunContinuationsAsynchronously);
-            stateObservable = new ReplayObservable<ClusterConfigClientState>();
+            stateObservable = new CachingObservable<ClusterConfigClientState>();
             clientState = new AtomicInt(State_NotStarted);
             observablePropagationLock = new object();
         }
@@ -260,7 +260,7 @@ namespace Vostok.ClusterConfig.Client
 
             // (iloktionov): 'stateObservable' might have been already completed by failed initial update iteration. In that case it has to be created from scratch:
             if (stateObservable.IsCompleted)
-                Interlocked.Exchange(ref stateObservable, new ReplayObservable<ClusterConfigClientState>());
+                Interlocked.Exchange(ref stateObservable, new CachingObservable<ClusterConfigClientState>());
 
             // (iloktionov): External observers may take indefinitely long to call, so it's best to offload their callbacks to ThreadPool:
             Task.Run(

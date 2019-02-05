@@ -7,9 +7,9 @@ using Vostok.ClusterConfig.Client.Helpers;
 namespace Vostok.ClusterConfig.Client.Tests.Helpers
 {
     [TestFixture]
-    internal class ReplayObservable_Tests
+    internal class CachingObservable_Tests
     {
-        private ReplayObservable<string> observable;
+        private CachingObservable<string> observable;
         private IObserver<string> observer1;
         private IObserver<string> observer2;
         private Exception error1;
@@ -18,7 +18,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Helpers
         [SetUp]
         public void TestSetup()
         {
-            observable = new ReplayObservable<string>();
+            observable = new CachingObservable<string>();
 
             observer1 = Substitute.For<IObserver<string>>();
             observer2 = Substitute.For<IObserver<string>>();
