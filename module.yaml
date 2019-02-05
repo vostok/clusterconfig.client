@@ -20,6 +20,7 @@ notests *default:
     - vostok.clusterconfig.core/src
     - vostok.commons.collections/src
     - vostok.commons.threading/src
+    - vostok.commons.time/src
 
 full-build > notests:
   deps:
