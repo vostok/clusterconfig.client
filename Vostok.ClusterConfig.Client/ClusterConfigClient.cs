@@ -16,8 +16,6 @@ namespace Vostok.ClusterConfig.Client
 {
     // TODO(iloktionov): threading for observables
 
-    // TODO(iloktionov): Dispose() should probably wait for periodic updater completion
-
     /// <inheritdoc cref="IClusterConfigClient"/>
     [PublicAPI]
     public class ClusterConfigClient : IClusterConfigClient, IDisposable
@@ -161,7 +159,7 @@ namespace Vostok.ClusterConfig.Client
 
                     if (currentState == null || localUpdateResult.Changed || remoteUpdateResult.Changed)
                     {
-                        PropagateNewState(CreateNewState(currentState, localUpdateResult, remoteUpdateResult));
+                        PropagateNewState(CreateNewState(currentState, localUpdateResult, remoteUpdateResult), cancellationToken);
                     }
 
                     lastLocalResult = localUpdateResult;
@@ -207,10 +205,14 @@ namespace Vostok.ClusterConfig.Client
             return new ClusterConfigClientState(newLocalTree, newRemoteTree, newCaches, newVersion);
         }
 
-        private void PropagateNewState([NotNull] ClusterConfigClientState state)
+        private void PropagateNewState([NotNull] ClusterConfigClientState state, CancellationToken cancellationToken)
         {
             if (!stateSource.TrySetResult(state))
             {
+                // (iloktionov): No point in overwriting ObjectDisposedException stored in 'stateSource' in case the client was disposed.
+                if (cancellationToken.IsCancellationRequested)
+                    return;
+
                 var newStateSource = new TaskCompletionSource<ClusterConfigClientState>();
 
                 newStateSource.SetResult(state);
