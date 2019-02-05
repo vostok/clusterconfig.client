@@ -144,5 +144,21 @@ namespace Vostok.ClusterConfig.Client.Tests.Helpers
             observer1.Received().OnNext("1");
             observer2.DidNotReceive().OnNext("1");
         }
+
+        [Test]
+        public void Exception_in_one_of_the_observers_should_not_prevent_invocation_of_the_rest()
+        {
+            observable.Subscribe(observer1);
+            observable.Subscribe(observer2);
+
+            observer1
+                .WhenForAnyArgs(o => o.OnNext(default))
+                .Throw(new Exception());
+
+            observable.Next("1");
+
+            observer1.Received().OnNext("1");
+            observer2.Received().OnNext("1");
+        }
     }
 }
