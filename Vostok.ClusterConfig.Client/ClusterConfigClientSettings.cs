@@ -1,4 +1,5 @@
-﻿using JetBrains.Annotations;
+﻿using System;
+using JetBrains.Annotations;
 using Vostok.Clusterclient.Core.Topology;
 using Vostok.ClusterConfig.Client.Helpers;
 
@@ -40,5 +41,10 @@ namespace Vostok.ClusterConfig.Client
         public IClusterProvider Cluster { get; set; } = new DnsClusterProvider(
             ClusterConfigClientDefaults.Dns, 
             ClusterConfigClientDefaults.Port);
+
+        /// <summary>
+        /// Gets or sets the period of data updates. It affects both remote queries and local folder checks.
+        /// </summary>
+        public TimeSpan UpdatePeriod { get; set; } = ClusterConfigClientDefaults.UpdatePeriod;
     }
 }

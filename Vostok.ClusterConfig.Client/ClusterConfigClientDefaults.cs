@@ -1,4 +1,5 @@
-﻿using JetBrains.Annotations;
+﻿using System;
+using JetBrains.Annotations;
 
 namespace Vostok.ClusterConfig.Client
 {
@@ -15,5 +16,7 @@ namespace Vostok.ClusterConfig.Client
         public const string LocalFolder = "settings";
 
         public const int Port = 9000;
+
+        public static readonly TimeSpan UpdatePeriod = TimeSpan.FromSeconds(20);
     }
 }
