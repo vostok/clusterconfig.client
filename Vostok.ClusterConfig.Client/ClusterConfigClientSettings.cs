@@ -59,7 +59,8 @@ namespace Vostok.ClusterConfig.Client
         public int CacheCapacity { get; set; } = ClusterConfigClientDefaults.CacheCapacity;
 
         /// <summary>
-        /// Gets or sets the maximum allowed file size. Local files larger than this will be ignored.
+        /// <para>Gets or sets the maximum allowed file size. Local files larger than this will be ignored.</para>
+        /// <para>Only relevant when <see cref="EnableLocalSettings"/> is set to <c>true</c>.</para>
         /// </summary>
         public int MaximumFileSize { get; set; } = ClusterConfigClientDefaults.MaximumFileSize;
     }
