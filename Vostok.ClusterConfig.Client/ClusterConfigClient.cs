@@ -10,14 +10,13 @@ using Vostok.Commons.Threading;
 using Vostok.Configuration.Abstractions.Merging;
 using Vostok.Configuration.Abstractions.SettingsTree;
 using Vostok.Configuration.Sources.Extensions.Observable;
+using Vostok.Logging.Abstractions;
 
 namespace Vostok.ClusterConfig.Client
 {
     // TODO(iloktionov): threading for observables
 
     // TODO(iloktionov): Dispose() should probably wait for periodic updater completion
-
-    // TODO(iloktionov): ForContext() for logger
 
     /// <inheritdoc cref="IClusterConfigClient"/>
     [PublicAPI]
@@ -38,6 +37,7 @@ namespace Vostok.ClusterConfig.Client
         private readonly ClusterConfigClientSettings settings;
         private readonly CancellationTokenSource cancellationSource;
         private readonly AtomicInt clientState;
+        private readonly ILog log;
 
         private TaskCompletionSource<ClusterConfigClientState> stateSource;
         private ReplayObservable<ClusterConfigClientState> stateObservable;
@@ -45,6 +45,8 @@ namespace Vostok.ClusterConfig.Client
         public ClusterConfigClient([NotNull] ClusterConfigClientSettings settings)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
+
+            log = settings.Log.ForContext<ClusterConfigClient>();
 
             stateSource = new TaskCompletionSource<ClusterConfigClientState>(TaskCreationOptions.RunContinuationsAsynchronously);
             stateObservable = new ReplayObservable<ClusterConfigClientState>();
@@ -171,7 +173,7 @@ namespace Vostok.ClusterConfig.Client
                 }
                 catch (Exception error)
                 {
-                    // TODO(iloktionov): log the exception
+                    log.Warn(error, "Periodical settings update has failed.");
 
                     if (currentState == null)
                         PropagateError(new ClusterConfigClientException("Failure in initial settings update.", error));
