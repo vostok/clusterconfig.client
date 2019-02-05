@@ -17,6 +17,8 @@ namespace Vostok.ClusterConfig.Client
 
         public const int Port = 9000;
 
+        public const int CacheCapacity = 25;
+
         public static readonly TimeSpan UpdatePeriod = TimeSpan.FromSeconds(20);
     }
 }

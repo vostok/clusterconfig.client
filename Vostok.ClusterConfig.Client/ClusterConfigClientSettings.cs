@@ -52,5 +52,10 @@ namespace Vostok.ClusterConfig.Client
         /// Gets or sets the log used for internal diagnostic messages.
         /// </summary>
         public ILog Log { get; set; } = LogProvider.Get();
+
+        /// <summary>
+        /// Gets or sets the capacity of the internal cache storing subtrees corresponding to requested prefixes.
+        /// </summary>
+        public int CacheCapacity { get; set; } = ClusterConfigClientDefaults.CacheCapacity;
     }
 }
