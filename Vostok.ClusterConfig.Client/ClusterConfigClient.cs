@@ -56,6 +56,12 @@ namespace Vostok.ClusterConfig.Client
         {
         }
 
+        public string Zone => settings.Zone;
+
+        public long Version => GetCurrentState()?.Version ?? 0L;
+
+        public bool HasInitialized => GetCurrentState() != null;
+
         /// <inheritdoc />
         public ISettingsNode Get(ClusterConfigPath prefix)
             => GetSettings(ObtainState(), prefix).settings;
