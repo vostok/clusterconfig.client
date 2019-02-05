@@ -57,6 +57,8 @@
     </Reference>
   </ItemGroup>
 
+  <Import Project="..\..\vostok.commons.binary\BinaryBufferReader.props" />
+  <Import Project="..\..\vostok.commons.binary\BinaryBufferWriter.props" />
   <Import Project="..\..\vostok.clusterconfig.core\Vostok.ClusterConfig.Core.props" />
 
 </Project>
