@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using JetBrains.Annotations;
 using Vostok.Clusterclient.Core.Topology;
 using Vostok.ClusterConfig.Client.Helpers;
@@ -57,5 +58,10 @@ namespace Vostok.ClusterConfig.Client
         /// Gets or sets the capacity of the internal cache storing subtrees corresponding to requested prefixes.
         /// </summary>
         public int CacheCapacity { get; set; } = ClusterConfigClientDefaults.CacheCapacity;
+
+        /// <summary>
+        /// Gets or sets the maximum allowed file size. Local files larger than this will be ignored.
+        /// </summary>
+        public int MaximumFileSize { get; set; } = ClusterConfigClientDefaults.MaximumFileSize;
     }
 }
