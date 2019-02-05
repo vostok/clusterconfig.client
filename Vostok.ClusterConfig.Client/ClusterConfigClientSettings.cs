@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using JetBrains.Annotations;
 using Vostok.Clusterclient.Core.Topology;
 using Vostok.ClusterConfig.Client.Helpers;
