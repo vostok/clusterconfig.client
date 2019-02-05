@@ -14,10 +14,10 @@ using Vostok.Configuration.Abstractions.SettingsTree;
 using Vostok.Configuration.Sources.Extensions.Observable;
 using Vostok.Logging.Abstractions;
 
+// ReSharper disable MethodSupportsCancellation
+
 namespace Vostok.ClusterConfig.Client
 {
-    // TODO(iloktionov): threading for observables
-
     /// <inheritdoc cref="IClusterConfigClient"/>
     [PublicAPI]
     public class ClusterConfigClient : IClusterConfigClient, IDisposable
@@ -39,6 +39,8 @@ namespace Vostok.ClusterConfig.Client
         private readonly AtomicInt clientState;
         private readonly ILog log;
 
+        private readonly object observablePropagationLock;
+
         private TaskCompletionSource<ClusterConfigClientState> stateSource;
         private ReplayObservable<ClusterConfigClientState> stateObservable;
 
@@ -51,6 +53,7 @@ namespace Vostok.ClusterConfig.Client
             stateSource = new TaskCompletionSource<ClusterConfigClientState>(TaskCreationOptions.RunContinuationsAsynchronously);
             stateObservable = new ReplayObservable<ClusterConfigClientState>();
             clientState = new AtomicInt(State_NotStarted);
+            observablePropagationLock = new object();
         }
 
         public ClusterConfigClient()
@@ -255,16 +258,28 @@ namespace Vostok.ClusterConfig.Client
                 Interlocked.Exchange(ref stateSource, newStateSource);
             }
 
+            // (iloktionov): 'stateObservable' might have been already completed by failed initial update iteration. In that case it has to be created from scratch:
             if (stateObservable.IsCompleted)
                 Interlocked.Exchange(ref stateObservable, new ReplayObservable<ClusterConfigClientState>());
 
-            stateObservable.Next(state);
+            // (iloktionov): External observers may take indefinitely long to call, so it's best to offload their callbacks to ThreadPool:
+            Task.Run(
+                () =>
+                {
+                    // (iloktionov): Ref check on the state under lock prevent reordering of async observer notifications.
+                    // (iloktionov): Older ones may get lost in the event of a race, but that's acceptable.
+                    lock (observablePropagationLock)
+                    {
+                        if (ReferenceEquals(state, GetCurrentState()))
+                            stateObservable.Next(state);
+                    }
+                });
         }
 
         private void PropagateError([NotNull] Exception error)
         {
             if (stateSource.TrySetException(error))
-                stateObservable.Error(error);
+                Task.Run(() => stateObservable.Error(error));
         }
     }
 }
