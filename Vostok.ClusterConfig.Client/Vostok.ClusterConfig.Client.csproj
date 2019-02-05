@@ -57,6 +57,10 @@
     </Reference>
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\..\vostok.commons.collections\Vostok.Commons.Collections\RecyclingBoundedCache.cs" Link="Commons\RecyclingBoundedCache.cs" />
+  </ItemGroup>
+
   <Import Project="..\..\vostok.commons.binary\BinaryBufferReader.props" />
   <Import Project="..\..\vostok.commons.binary\BinaryBufferWriter.props" />
   <Import Project="..\..\vostok.clusterconfig.core\Vostok.ClusterConfig.Core.props" />

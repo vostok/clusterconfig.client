@@ -2,6 +2,7 @@
 using JetBrains.Annotations;
 using Vostok.Clusterclient.Core.Topology;
 using Vostok.ClusterConfig.Client.Helpers;
+using Vostok.Logging.Abstractions;
 
 namespace Vostok.ClusterConfig.Client
 {
@@ -46,5 +47,10 @@ namespace Vostok.ClusterConfig.Client
         /// Gets or sets the period of data updates. It affects both remote queries and local folder checks.
         /// </summary>
         public TimeSpan UpdatePeriod { get; set; } = ClusterConfigClientDefaults.UpdatePeriod;
+
+        /// <summary>
+        /// Gets or sets the log used for internal diagnostic messages.
+        /// </summary>
+        public ILog Log { get; set; } = LogProvider.Get();
     }
 }
