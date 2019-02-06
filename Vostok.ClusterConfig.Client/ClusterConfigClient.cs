@@ -61,10 +61,19 @@ namespace Vostok.ClusterConfig.Client
         {
         }
 
+        /// <summary>
+        /// Returns the zone this client is operating in.
+        /// </summary>
         public string Zone => settings.Zone;
 
+        /// <summary>
+        /// Returns current cached zone version (local to this <see cref="ClusterConfigClient"/> instance), or zero if initial update hasn't happened yet.
+        /// </summary>
         public long Version => GetCurrentState()?.Version ?? 0L;
 
+        /// <summary>
+        /// Returns <c>true</c> if initial settings update has already been completed, or <c>false</c> otherwise.
+        /// </summary>
         public bool HasInitialized => GetCurrentState() != null;
 
         /// <inheritdoc />
