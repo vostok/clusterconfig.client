@@ -17,6 +17,8 @@ namespace Vostok.ClusterConfig.Client.Helpers
             this.serializer = serializer;
         }
 
+        public int Size => serialized?.Length ?? 0;
+
         [CanBeNull]
         public ISettingsNode GetSettings(ClusterConfigPath path)
             => serializer.Deserialize(new BinaryBufferReader(serialized, 0), path.Segments);

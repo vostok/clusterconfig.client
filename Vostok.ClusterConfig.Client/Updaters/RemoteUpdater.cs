@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using JetBrains.Annotations;
 using Vostok.Clusterclient.Core;
 using Vostok.Clusterclient.Core.Misc;
 using Vostok.Clusterclient.Core.Model;
@@ -8,28 +10,70 @@ using Vostok.Clusterclient.Core.Ordering.Weighed;
 using Vostok.Clusterclient.Core.Strategies;
 using Vostok.Clusterclient.Core.Topology;
 using Vostok.Clusterclient.Transport;
+using Vostok.ClusterConfig.Client.Exceptions;
+using Vostok.ClusterConfig.Client.Helpers;
+using Vostok.ClusterConfig.Core.Serialization;
 using Vostok.Logging.Abstractions;
 
 namespace Vostok.ClusterConfig.Client.Updaters
 {
     internal class RemoteUpdater
     {
-        private const string TargetService = "ClusterConfig";
+        private static readonly DateTime EmptyResultVersion = DateTime.MinValue;
 
+        private readonly bool enabled;
         private readonly IClusterClient client;
         private readonly ILog log;
         private readonly string zone;
 
-        public RemoteUpdater(IClusterProvider clusterProvider, ILog log, string zone)
+        public RemoteUpdater(bool enabled, IClusterClient client, ILog log, string zone)
         {
+            this.enabled = enabled;
+            this.client = client;
             this.log = log;
             this.zone = zone;
+        }
 
-            client = new ClusterClient(
+        public RemoteUpdater(bool enabled, IClusterProvider cluster, ILog log, string zone)
+            : this(enabled, enabled ? CreateClient(cluster, log) : null, log, zone)
+        {
+        }
+
+        public async Task<RemoteUpdateResult> UpdateAsync(RemoteUpdateResult lastResult, CancellationToken cancellationToken)
+        {
+            if (!enabled)
+                return CreateEmptyResult(lastResult);
+
+            var request = CreateRequest(lastResult?.Version);
+
+            var requestResult = await client.SendAsync(request, cancellationToken: cancellationToken).ConfigureAwait(false);
+
+            if (cancellationToken.IsCancellationRequested)
+                throw new OperationCanceledException();
+
+            var updateResult = TryHandleFailure(requestResult, lastResult);
+            if (updateResult != null)
+                return updateResult;
+
+            switch (requestResult.Response.Code)
+            {
+                case ResponseCode.NotModified:
+                    return HandleNotModifiedResponse(lastResult);
+
+                case ResponseCode.Ok:
+                    return HandleSuccessResponse(lastResult, requestResult.Response);
+            }
+
+            throw NoAcceptableResponseException(requestResult);
+        }
+
+        private static ClusterClient CreateClient(IClusterProvider cluster, ILog log)
+        {
+            return new ClusterClient(
                 log.WithMinimumLevel(LogLevel.Warn),
                 config =>
                 {
-                    config.ClusterProvider = clusterProvider;
+                    config.ClusterProvider = cluster;
                     config.SetupUniversalTransport();
 
                     config.DefaultTimeout = TimeSpan.FromSeconds(30);
@@ -43,53 +87,126 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
                     config.MaxReplicasUsedPerRequest = int.MaxValue;
 
-                    config.TargetServiceName = TargetService;
+                    config.TargetServiceName = "ClusterConfig";
 
                     config.SetupWeighedReplicaOrdering(
                         builder => builder.AddAdaptiveHealthModifierWithLinearDecay(TimeSpan.FromMinutes(2)));
 
-                    // TODO(iloktionov): auxiliary headers (client identity, request timeout)
+                    config.ResponseCriteria.Insert(0, new Reject404ErrorsCriterion());
 
-                    // TODO(iloktionov): custom response criteria (reject 404s?)
+                    config.AddResponseTransform(new GzipBodyTransform());
                 });
         }
 
-        // TODO(iloktionov): handle disabled case
+        private static RemoteUpdateResult CreateEmptyResult([CanBeNull] RemoteUpdateResult lastResult)
+            => new RemoteUpdateResult(lastResult?.Version == EmptyResultVersion, null, EmptyResultVersion);
 
-        // TODO(iloktionov): handle the case when there are no replicas and there was no previous state (assume there's no CC deployed)
-
-        // TODO(iloktionov): do not trust 404 response from a single replica
-
-        // TODO(iloktionov): do not trust 304 response if a version has not been sent
-
-        // TODO(iloktionov): protect against flapping between two versions when communicating with out-of-sync replicas
-
-        public async Task<RemoteUpdateResult> UpdateAsync(RemoteUpdateResult lastResult, CancellationToken cancellationToken)
-        {
-            var request = Request.Get(zone);
-
-            var result = await client.SendAsync(request, cancellationToken: cancellationToken).ConfigureAwait(false);
-
-            // TODO(iloktionov): handle errors in result
-
-            var response = result.Response;
-
-            // TODO(iloktionov): handle different response codes
-
-            throw new NotImplementedException();
-        }
-
-        private Request CreateRequest(RemoteUpdateResult lastResult)
+        private Request CreateRequest(DateTime? lastVersion)
         {
             var request = Request.Get(zone)
                 .WithAdditionalQueryParameter("binaryProtocol", "v1")
                 .WithAcceptHeader("application/octet-stream")
                 .WithAcceptEncodingHeader("gzip");
 
-            if (lastResult != null)
-                request = request.WithIfModifiedSinceHeader(lastResult.Version);
+            if (lastVersion.HasValue)
+                request = request.WithIfModifiedSinceHeader(lastVersion.Value);
 
             return request;
         }
+
+        [CanBeNull]
+        private RemoteUpdateResult TryHandleFailure(ClusterResult requestResult, RemoteUpdateResult lastUpdateResult)
+        {
+            switch (requestResult.Status)
+            {
+                case ClusterResultStatus.ReplicasNotFound:
+                    // (iloktionov): If no replicas were resolved on during update and we haven't seen any non-trivial settings earlier, 
+                    // (iloktionov): we just silently assume CC is not deployed in current environment and return empty settings.
+                    if (lastUpdateResult?.Tree == null)
+                        return CreateEmptyResult(lastUpdateResult);
+
+                    break;
+
+                case ClusterResultStatus.ReplicasExhausted:
+                    // (iloktionov): Getting here means that no replica returned a 200 or 304 response.
+                    // (iloktionov): If at least some of them responded with 404, it's reasonably safe to assume that zone does not exist.
+                    if (requestResult.ReplicaResults.Any(r => r.Response.Code == ResponseCode.NotFound))
+                    {
+                        var updateResult = CreateEmptyResult(lastUpdateResult);
+                        if (updateResult.Changed)
+                            LogZoneDoesNotExist();
+
+                        return updateResult;
+                    }
+
+                    break;
+            }
+
+            return null;
+        }
+
+        [NotNull]
+        private RemoteUpdateResult HandleNotModifiedResponse(RemoteUpdateResult lastUpdateResult)
+        {
+            if (lastUpdateResult == null)
+                throw UnexpectedNotModifiedResponseException();
+
+            return new RemoteUpdateResult(false, lastUpdateResult.Tree, lastUpdateResult.Version);
+        }
+
+        [NotNull]
+        private RemoteUpdateResult HandleSuccessResponse(RemoteUpdateResult lastUpdateResult, Response response)
+        {
+            if (!response.HasContent)
+                throw Empty200ResponseException();
+
+            if (response.Headers.LastModified == null)
+                throw MissingLastModifiedHeaderException();
+
+            var version = DateTime.Parse(response.Headers.LastModified).ToUniversalTime();
+
+            if (lastUpdateResult != null && version < lastUpdateResult.Version)
+            {
+                LogStaleVersion(version, lastUpdateResult.Version);
+
+                return new RemoteUpdateResult(false, lastUpdateResult.Tree, lastUpdateResult.Version);
+            }
+
+            var tree = new RemoteTree(response.Content.ToArray(), TreeSerializers.V1);
+
+            LogReceivedNewZone(tree, version);
+
+            return new RemoteUpdateResult(true, tree, version);
+        }
+
+        #region Logging
+
+        private void LogZoneDoesNotExist()
+          => log.Warn("Zone '{Zone}' not found. Returning empty remote settings.", zone);
+
+        private void LogStaleVersion(DateTime staleVersion, DateTime currentVersion)
+            => log.Warn("Received response for zone '{Zone}' with stale version '{StaleVersion}'. Current version = '{CurrentVersion}'. Will not update.",
+                zone, staleVersion, currentVersion);
+
+        private void LogReceivedNewZone(RemoteTree tree, DateTime version)
+            => log.Info("Received new version of zone '{Zone}'. Size = {Size}. Version = {Version}.", zone, tree.Size, version.ToString("R"));
+
+        #endregion
+
+        #region Exceptions
+
+        private static Exception UnexpectedNotModifiedResponseException()
+            => new RemoteUpdateException("Received unexpected 'NotModified' response from server although no current version was sent in request.");
+
+        private static Exception Empty200ResponseException()
+            => new RemoteUpdateException("Received an empty 200 response from server. Nothing to deserialize.");
+
+        private static Exception MissingLastModifiedHeaderException() 
+            => new RemoteUpdateException("Received a 200 response without 'LastModified' header.");
+
+        private static Exception NoAcceptableResponseException(ClusterResult result)
+            => new RemoteUpdateException($"Failed to update settings from server. Request status = '{result.Status}'. Replica responses = '{string.Join(", ", result.ReplicaResults.Select(r => r.Response.Code))}'.");
+
+        #endregion
     }
 }
