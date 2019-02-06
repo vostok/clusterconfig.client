@@ -26,8 +26,6 @@ namespace Vostok.ClusterConfig.Client
         private const int State_Started = 2;
         private const int State_Disposed = 3;
 
-        private static readonly ClusterConfigClientSettings DefaultSettings = new ClusterConfigClientSettings();
-
         private static readonly SettingsMergeOptions DefaultMergeOptions = new SettingsMergeOptions
         {
             ObjectMergeStyle = ObjectMergeStyle.Deep,
@@ -44,6 +42,9 @@ namespace Vostok.ClusterConfig.Client
         private TaskCompletionSource<ClusterConfigClientState> stateSource;
         private CachingObservable<ClusterConfigClientState> stateObservable;
 
+        /// <summary>
+        /// Creates a new instance of <see cref="ClusterConfigClient"/> with given <paramref name="settings"/>.
+        /// </summary>
         public ClusterConfigClient([NotNull] ClusterConfigClientSettings settings)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -56,8 +57,11 @@ namespace Vostok.ClusterConfig.Client
             observablePropagationLock = new object();
         }
 
+        /// <summary>
+        /// Creates a new instance of <see cref="ClusterConfigClient"/> with default settings provided by <see cref="DefaultSettingsProvider"/>.
+        /// </summary>
         public ClusterConfigClient()
-            : this(DefaultSettings)
+            : this(DefaultSettingsProvider.Settings)
         {
         }
 
