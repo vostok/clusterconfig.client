@@ -1,5 +1,7 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using JetBrains.Annotations;
+using Vostok.ClusterConfig.Client.Exceptions;
 using Vostok.ClusterConfig.Core.Parsers;
 using Vostok.Configuration.Abstractions.SettingsTree;
 
@@ -30,9 +32,16 @@ namespace Vostok.ClusterConfig.Client.Updaters
             if (!enabled)
                 return null;
 
-            folder.Refresh();
+            try
+            {
+                folder.Refresh();
 
-            return folder.Exists ? zoneParser.Parse(folder) : null;
+                return folder.Exists ? zoneParser.Parse(folder) : null;
+            }
+            catch (Exception error)
+            {
+                throw new LocalUpdateException("Failed to update from local files.", error);
+            }
         }
     }
 }

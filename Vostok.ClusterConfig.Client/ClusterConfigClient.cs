@@ -205,25 +205,30 @@ namespace Vostok.ClusterConfig.Client
 
         private LocalUpdater CreateLocalUpdater()
         {
-            var fileParserSettings = new FileParserSettings
-            {
-                MaximumFileSize = settings.MaximumFileSize
-            };
-
-            var fileParser = new FileParser(fileParserSettings);
-
-            var zoneParser = new ZoneParser(fileParser);
-
-            var localFolder = FolderLocator.Locate(settings.LocalFolder, 3);
-
             if (settings.EnableLocalSettings)
-                log.Info("Resolved local settings directory path to '{LocalFolder}'.", localFolder.FullName);
+            {
+                var fileParserSettings = new FileParserSettings
+                {
+                    MaximumFileSize = settings.MaximumFileSize
+                };
 
-            return new LocalUpdater(settings.EnableLocalSettings, localFolder, zoneParser);
+                var fileParser = new FileParser(fileParserSettings);
+
+                var zoneParser = new ZoneParser(fileParser);
+
+                var localFolder = FolderLocator.Locate(settings.LocalFolder, 3);
+
+                if (settings.EnableLocalSettings)
+                    log.Info("Resolved local settings directory path to '{LocalFolder}'.", localFolder.FullName);
+
+                return new LocalUpdater(true, localFolder, zoneParser);
+            }
+
+            return new LocalUpdater(false, null, null);
         }
 
         private RemoteUpdater CreateRemoteUpdater()
-            => throw new NotImplementedException();
+            => new RemoteUpdater(settings.EnableClusterSettings, settings.Cluster, log, settings.Zone);
 
         [CanBeNull]
         private ClusterConfigClientState GetCurrentState()
