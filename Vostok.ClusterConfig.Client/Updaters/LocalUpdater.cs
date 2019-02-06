@@ -24,7 +24,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
         {
             var freshTree = UpdateTree();
            
-            return new LocalUpdateResult(Equals(lastResult?.Tree, freshTree), freshTree);
+            return new LocalUpdateResult(lastResult == null || !Equals(lastResult.Tree, freshTree), freshTree);
         }
 
         private ISettingsNode UpdateTree()
