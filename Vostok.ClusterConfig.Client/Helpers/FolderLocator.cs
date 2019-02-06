@@ -5,9 +5,9 @@ namespace Vostok.ClusterConfig.Client.Helpers
 {
     internal static class FolderLocator
     {
-        public static DirectoryInfo Locate(string relativePath, int maxOutwardHops)
+        public static DirectoryInfo Locate(string from, string relativePath, int maxOutwardHops)
         {
-            var baseDirectory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            var baseDirectory = new DirectoryInfo(from);
 
             var initialGuess = new DirectoryInfo(Path.Combine(baseDirectory.FullName, relativePath));
             if (initialGuess.Exists)

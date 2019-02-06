@@ -216,7 +216,7 @@ namespace Vostok.ClusterConfig.Client
 
                 var zoneParser = new ZoneParser(fileParser);
 
-                var localFolder = FolderLocator.Locate(settings.LocalFolder, 3);
+                var localFolder = FolderLocator.Locate(AppDomain.CurrentDomain.BaseDirectory, settings.LocalFolder, 3);
 
                 if (settings.EnableLocalSettings)
                     log.Info("Resolved local settings directory path to '{LocalFolder}'.", localFolder.FullName);
