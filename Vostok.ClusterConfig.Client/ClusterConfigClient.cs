@@ -85,11 +85,15 @@ namespace Vostok.ClusterConfig.Client
 
         /// <inheritdoc />
         public IObservable<ISettingsNode> Observe(ClusterConfigPath prefix)
-            => ObtainStateObservable().Select(state => GetSettings(state, prefix).settings);
+            => ObtainStateObservable()
+                .Select(state => GetSettings(state, prefix).settings)
+                .DistinctUntilChanged();
 
         /// <inheritdoc />
         public IObservable<(ISettingsNode settings, long version)> ObserveWithVersions(ClusterConfigPath prefix)
-            => ObtainStateObservable().Select(state => GetSettings(state, prefix));
+            => ObtainStateObservable()
+                .Select(state => GetSettings(state, prefix))
+                .DistinctUntilChanged(tuple => tuple.settings);
 
         public void Dispose()
         {
