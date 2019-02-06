@@ -49,6 +49,12 @@ namespace Vostok.ClusterConfig.Client
         public TimeSpan UpdatePeriod { get; set; } = ClusterConfigClientDefaults.UpdatePeriod;
 
         /// <summary>
+        /// <para>Gets or sets the timeout for server requests.</para>
+        /// <para>Only relevant when <see cref="EnableClusterSettings"/> is set to <c>true</c>.</para>
+        /// </summary>
+        public TimeSpan RequestTimeout { get; set; } = ClusterConfigClientDefaults.RequestTimeout;
+
+        /// <summary>
         /// Gets or sets the log used for internal diagnostic messages.
         /// </summary>
         public ILog Log { get; set; } = LogProvider.Get();
