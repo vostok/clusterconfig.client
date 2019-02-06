@@ -1,0 +1,10 @@
+# This file must be named 'settings/clusterconfig' relative to application domain's base path.
+# All lines are optional and can be omitted to use default values.
+
+enableLocalSettings := true
+enableClusterSettings := true
+localSettingsDirectory := settings
+clusterSettingsZoneName := default
+clusterConfigHost := clusterconfig:9000
+refreshPeriod := 00:01:00
+requestTimeout := 00:00:20
