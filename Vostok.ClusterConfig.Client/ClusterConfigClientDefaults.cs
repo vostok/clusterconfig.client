@@ -15,6 +15,8 @@ namespace Vostok.ClusterConfig.Client
 
         public const string LocalFolder = "settings";
 
+        public const string ConfigurationFile = "clusterconfig";
+
         public const int Port = 9000;
 
         public const int CacheCapacity = 25;
