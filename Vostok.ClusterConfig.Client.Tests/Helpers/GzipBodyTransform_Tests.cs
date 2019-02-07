@@ -53,10 +53,12 @@ namespace Vostok.ClusterConfig.Client.Tests.Helpers
             new Random(Guid.NewGuid().GetHashCode()).NextBytes(content);
 
             var compressBuffer = new MemoryStream();
-            var compressStream = new GZipStream(compressBuffer, CompressionMode.Compress);
 
-            compressStream.Write(content, 0, content.Length);
-            compressStream.Flush();
+            using (var compressStream = new GZipStream(compressBuffer, CompressionMode.Compress))
+            {
+                compressStream.Write(content, 0, content.Length);
+                compressStream.Flush();
+            }
 
             var response = new Response(ResponseCode.Ok)
                 .WithHeader(HeaderNames.ContentEncoding, "gzip")

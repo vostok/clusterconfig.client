@@ -18,11 +18,12 @@ namespace Vostok.ClusterConfig.Client.Helpers
             if (response.Headers.ContentEncoding != "gzip")
                 return response;
 
-            var gzipStream = new GZipStream(response.Content.ToMemoryStream(), CompressionMode.Decompress);
-
             var bufferStream = new MemoryStream(response.Content.Length);
 
-            gzipStream.CopyTo(bufferStream);
+            using (var gzipStream = new GZipStream(response.Content.ToMemoryStream(), CompressionMode.Decompress))
+            {
+                gzipStream.CopyTo(bufferStream);
+            }
 
             return response.WithContent(bufferStream.ToArray());
         }
