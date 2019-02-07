@@ -14,14 +14,17 @@ namespace Vostok.ClusterConfig.Client
     [PublicAPI]
     public static class DefaultSettingsProvider
     {
-        private static readonly ClusterConfigClientSettings Default 
+        private static readonly ClusterConfigClientSettings Default
             = new ClusterConfigClientSettings();
 
-        private static readonly Lazy<ClusterConfigClientSettings> Source 
+        private static volatile Lazy<ClusterConfigClientSettings> Source
             = new Lazy<ClusterConfigClientSettings>(Initialize, LazyThreadSafetyMode.ExecutionAndPublication);
 
         [NotNull]
         public static ClusterConfigClientSettings Settings => Source.Value;
+
+        internal static void Reset()
+            => Source = new Lazy<ClusterConfigClientSettings>(Initialize, LazyThreadSafetyMode.ExecutionAndPublication);
 
         private static ClusterConfigClientSettings Initialize()
         {

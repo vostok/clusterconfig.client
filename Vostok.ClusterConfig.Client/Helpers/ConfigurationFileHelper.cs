@@ -38,7 +38,10 @@ namespace Vostok.ClusterConfig.Client.Helpers
             {
                 int port = default;
 
-                if (TryGet(content, "ServerDNS", out var dns) || TryGet(content, "ServerPort", int.TryParse, out port))
+                var foundDns = TryGet(content, "ServerDNS", out var dns);
+                var foundPort = TryGet(content, "ServerPort", int.TryParse, out port);
+
+                if (foundDns || foundPort)
                 {
                     settings.Cluster = new DnsClusterProvider(
                         dns ?? ClusterConfigClientDefaults.Dns,
