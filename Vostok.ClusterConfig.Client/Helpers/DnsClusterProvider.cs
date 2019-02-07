@@ -11,22 +11,23 @@ namespace Vostok.ClusterConfig.Client.Helpers
     {
         private static readonly Uri[] EmptyCluster = {};
 
-        private readonly string dns;
-        private readonly int port;
-
         public DnsClusterProvider(string dns, int port)
         {
-            this.dns = dns;
-            this.port = port;
+            Dns = dns;
+            Port = port;
         }
+
+        public string Dns { get; }
+
+        public int Port { get; }
 
         public IList<Uri> GetCluster()
         {
             try
             {
-                return Dns
-                       .GetHostAddresses(dns)
-                       .Select(ip => new Uri($"http://{ip}:{port}/", UriKind.Absolute))
+                return System.Net.Dns
+                       .GetHostAddresses(Dns)
+                       .Select(ip => new Uri($"http://{ip}:{Port}/", UriKind.Absolute))
                        .ToArray();
             }
             catch (SocketException error)
@@ -37,7 +38,7 @@ namespace Vostok.ClusterConfig.Client.Helpers
                     return EmptyCluster;
                 }
 
-                throw new Exception($"Failed to resolve DNS name '{dns}'. Socket error code = {error.ErrorCode} ('{error.SocketErrorCode}').", error);
+                throw new Exception($"Failed to resolve DNS name '{Dns}'. Socket error code = {error.ErrorCode} ('{error.SocketErrorCode}').", error);
             }
         }
     }
