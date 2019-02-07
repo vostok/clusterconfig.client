@@ -56,6 +56,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         public void SetResponse(ISettingsNode tree, DateTime version)
             => response = Responses.Ok
                 .WithHeader(HeaderNames.LastModified, version.ToString("R"))
+                .WithHeader(HeaderNames.ContentEncoding, "gzip")
                 .WithContent(SerializeTree(tree));
 
         private void RequestHandlingLoop()
