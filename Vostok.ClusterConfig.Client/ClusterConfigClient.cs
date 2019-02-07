@@ -50,6 +50,7 @@ namespace Vostok.ClusterConfig.Client
             stateSource = new TaskCompletionSource<ClusterConfigClientState>(TaskCreationOptions.RunContinuationsAsynchronously);
             stateObservable = new CachingObservable<ClusterConfigClientState>();
             clientState = new AtomicInt(State_NotStarted);
+            cancellationSource = new CancellationTokenSource();
             observablePropagationLock = new object();
         }
 

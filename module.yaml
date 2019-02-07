@@ -25,6 +25,8 @@ notests *default:
 full-build > notests:
   deps:
     - vostok.logging.console
+    - vostok.commons.helpers/src
+    - vostok.commons.testing/src
 
   build:
     target: Vostok.ClusterConfig.Client.sln

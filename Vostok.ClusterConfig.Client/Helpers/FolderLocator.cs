@@ -6,6 +6,9 @@ namespace Vostok.ClusterConfig.Client.Helpers
     {
         public static DirectoryInfo Locate(string from, string relativePath, int maxOutwardHops)
         {
+            if (relativePath == Path.GetFullPath(relativePath))
+                return new DirectoryInfo(relativePath);
+
             var baseDirectory = new DirectoryInfo(from);
 
             var initialGuess = new DirectoryInfo(Path.Combine(baseDirectory.FullName, relativePath));
