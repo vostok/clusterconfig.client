@@ -10,6 +10,11 @@ namespace Vostok.ClusterConfig.Client
     /// <summary>
     /// <para>Provides default settings used in parameterless ctor of <see cref="ClusterConfigClient"/>.</para>
     /// <para>Looks in an optional configuration file located in <see cref="ClusterConfigClientDefaults.LocalFolder"/> and named <see cref="ClusterConfigClientDefaults.ConfigurationFile"/>.</para>
+    /// <para>Examples of valid configuration files:</para>
+    /// <list type="bullet">
+    ///     <item><description>https://github.com/vostok/clusterconfig.client/blob/master/Vostok.ClusterConfig.Client/config-2.example</description></item>
+    ///     <item><description>https://github.com/vostok/clusterconfig.client/blob/master/Vostok.ClusterConfig.Client/config-1.example</description></item>
+    /// </list>
     /// </summary>
     [PublicAPI]
     public static class DefaultSettingsProvider
