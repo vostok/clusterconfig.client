@@ -2,12 +2,12 @@
 using FluentAssertions;
 using FluentAssertions.Extensions;
 using NUnit.Framework;
+using Vostok.Clusterclient.Core.Model;
 using Vostok.Clusterclient.Core.Topology;
 using Vostok.ClusterConfig.Client.Abstractions;
 using Vostok.Commons.Testing;
 using Vostok.Commons.Testing.Observable;
 using Vostok.Configuration.Abstractions.SettingsTree;
-using Vostok.Logging.Abstractions;
 using Vostok.Logging.Console;
 
 namespace Vostok.ClusterConfig.Client.Tests.Functional
@@ -167,6 +167,101 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             folder.CreateFile("local", b => b.Append("value-2"));
 
             VerifyResults(default, 3, remoteTree2.Merge(localTree2));
+        }
+
+        [Test]
+        public void Should_return_null_tree_when_everything_is_disabled()
+        {
+            settings.EnableLocalSettings = false;
+            settings.EnableClusterSettings = false;
+
+            VerifyResults(default, 1, null);
+            VerifyResults("foo/bar", 1, null);
+        }
+
+        [Test]
+        public void Should_return_null_tree_when_requesting_missing_path()
+        {
+            server.SetResponse(remoteTree1, version1);
+
+            VerifyResults("foo/bar", 1, null);
+        }
+
+        [Test]
+        public void Should_return_null_tree_when_requesting_missing_zone_without_local_settings()
+        {
+            settings.EnableLocalSettings = false;
+
+            server.SetResponse(ResponseCode.NotFound);
+
+            VerifyResults(default, 1, null);
+        }
+
+        [Test]
+        public void Should_return_empty_tree_when_requesting_missing_zone_with_local_settings()
+        {
+            server.SetResponse(ResponseCode.NotFound);
+
+            VerifyResults(default, 1, new ObjectNode(null, null));
+        }
+
+        [Test]
+        public void Should_return_null_tree_when_there_are_no_replicas_without_local_settings()
+        {
+            settings.EnableLocalSettings = false;
+
+            settings.Cluster = new FixedClusterProvider();
+
+            VerifyResults(default, 1, null);
+        }
+
+        [Test]
+        public void Should_return_null_tree_when_there_are_no_replicas_with_local_settings()
+        {
+            settings.Cluster = new FixedClusterProvider();
+
+            VerifyResults(default, 1, new ObjectNode(null, null));
+        }
+
+        [Test]
+        public void Should_return_same_tree_object_while_nothing_changes()
+        {
+            server.SetResponse(remoteTree1, version1);
+
+            folder.CreateFile("local", b => b.Append("value-1"));
+
+            var tree1 = client.Get("");
+            var tree2 = client.Get("");
+
+            tree2.Should().BeSameAs(tree1);
+        }
+
+        [Test]
+        public void Should_not_downgrade_to_remote_settings_of_lesser_version()
+        {
+            server.SetResponse(remoteTree2, version2);
+
+            VerifyResults("", 1, remoteTree2);
+
+            server.SetResponse(remoteTree1, version1);
+
+            Action assertion = () => VerifyResults("", 1, remoteTree2);
+
+            assertion.ShouldNotFailIn(2.Seconds());
+        }
+
+        [Test]
+        public void Should_not_change_existing_settings_when_server_says_nothing_has_been_modified()
+        {
+            server.SetResponse(remoteTree2, version2);
+
+            VerifyResults("", 1, remoteTree2);
+
+            server.SetResponse(ResponseCode.NotModified);
+
+            Action assertion = () => VerifyResults("", 1, remoteTree2);
+
+            assertion.ShouldNotFailIn(2.Seconds());
         }
 
         private void VerifyResults(ClusterConfigPath path, int expectedVersion, ISettingsNode expectedTree)
