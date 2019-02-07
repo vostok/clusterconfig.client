@@ -17,7 +17,7 @@ namespace Vostok.ClusterConfig.Client.Tests
         {
             DefaultSettingsProvider.Reset();
 
-            settingsFolder = new DirectoryInfo(ClusterConfigClientDefaults.LocalFolder);
+            settingsFolder = new DirectoryInfo(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ClusterConfigClientDefaults.LocalFolder));
 
             EnsureDirectory();
         }
