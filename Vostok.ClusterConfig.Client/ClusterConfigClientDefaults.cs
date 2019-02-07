@@ -19,7 +19,7 @@ namespace Vostok.ClusterConfig.Client
 
         public const int Port = 9000;
 
-        public const int CacheCapacity = 25;
+        public const int CacheCapacity = 50;
 
         public const int MaximumFileSize = 1024 * 1024;
 

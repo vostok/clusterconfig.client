@@ -1,5 +1,4 @@
-﻿using System;
-using System.IO;
+﻿using System.IO;
 
 namespace Vostok.ClusterConfig.Client.Helpers
 {
@@ -13,16 +12,23 @@ namespace Vostok.ClusterConfig.Client.Helpers
             if (initialGuess.Exists)
                 return initialGuess;
 
-            for (var i = 0; i < maxOutwardHops; i++)
+            try
             {
-                baseDirectory = baseDirectory.Parent;
+                for (var i = 0; i < maxOutwardHops; i++)
+                {
+                    baseDirectory = baseDirectory.Parent;
 
-                if (baseDirectory == null)
-                    break;
+                    if (baseDirectory == null)
+                        break;
 
-                var folder = new DirectoryInfo(Path.Combine(baseDirectory.FullName, relativePath));
-                if (folder.Exists)
-                    return folder;
+                    var folder = new DirectoryInfo(Path.Combine(baseDirectory.FullName, relativePath));
+                    if (folder.Exists)
+                        return folder;
+                }
+            }
+            catch
+            {
+                // ignored
             }
 
             return initialGuess;
