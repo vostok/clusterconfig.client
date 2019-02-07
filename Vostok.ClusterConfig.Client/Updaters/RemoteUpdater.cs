@@ -99,7 +99,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
         }
 
         private static RemoteUpdateResult CreateEmptyResult([CanBeNull] RemoteUpdateResult lastResult)
-            => new RemoteUpdateResult(lastResult?.Version == EmptyResultVersion, null, EmptyResultVersion);
+            => new RemoteUpdateResult(lastResult?.Version != EmptyResultVersion, null, EmptyResultVersion);
 
         private Request CreateRequest(DateTime? lastVersion)
         {
