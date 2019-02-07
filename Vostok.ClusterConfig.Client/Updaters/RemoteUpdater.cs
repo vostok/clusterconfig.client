@@ -120,10 +120,15 @@ namespace Vostok.ClusterConfig.Client.Updaters
             switch (requestResult.Status)
             {
                 case ClusterResultStatus.ReplicasNotFound:
-                    // (iloktionov): If no replicas were resolved on during update and we haven't seen any non-trivial settings earlier, 
+                    // (iloktionov): If no replicas were resolved during update and we haven't seen any non-trivial settings earlier, 
                     // (iloktionov): we just silently assume CC is not deployed in current environment and return empty settings.
                     if (lastUpdateResult?.Tree == null)
+                    {
+                        if (lastUpdateResult == null)
+                            LogAssumingNoServer();
+
                         return CreateEmptyResult(lastUpdateResult);
+                    }
 
                     break;
 
@@ -165,9 +170,10 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
             var version = DateTime.Parse(response.Headers.LastModified).ToUniversalTime();
 
-            if (lastUpdateResult != null && version < lastUpdateResult.Version)
+            if (lastUpdateResult != null && version <= lastUpdateResult.Version)
             {
-                LogStaleVersion(version, lastUpdateResult.Version);
+                if (version < lastUpdateResult.Version)
+                    LogStaleVersion(version, lastUpdateResult.Version);
 
                 return new RemoteUpdateResult(false, lastUpdateResult.Tree, lastUpdateResult.Version);
             }
@@ -181,8 +187,11 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
         #region Logging
 
+        private void LogAssumingNoServer()
+            => log.Info("Resolved no replicas on initial settings update. Assumming that CC is not deployed in current environment.");
+
         private void LogZoneDoesNotExist()
-          => log.Warn("Zone '{Zone}' not found. Returning empty remote settings.", zone);
+            => log.Warn("Zone '{Zone}' not found. Returning empty remote settings.", zone);
 
         private void LogStaleVersion(DateTime staleVersion, DateTime currentVersion)
             => log.Warn("Received response for zone '{Zone}' with stale version '{StaleVersion}'. Current version = '{CurrentVersion}'. Will not update.",
