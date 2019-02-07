@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 using Vostok.Clusterclient.Core;
+using Vostok.Clusterclient.Core.Criteria;
 using Vostok.Clusterclient.Core.Misc;
 using Vostok.Clusterclient.Core.Model;
 using Vostok.Clusterclient.Core.Ordering.Weighed;
@@ -92,7 +93,14 @@ namespace Vostok.ClusterConfig.Client.Updaters
                     config.SetupWeighedReplicaOrdering(
                         builder => builder.AddAdaptiveHealthModifierWithLinearDecay(TimeSpan.FromMinutes(2)));
 
-                    config.ResponseCriteria.Insert(0, new Reject404ErrorsCriterion());
+                    config.SetupResponseCriteria(
+                        new AcceptNonRetriableCriterion(),
+                        new Reject404ErrorsCriterion(),
+                        new RejectNetworkErrorsCriterion(),
+                        new RejectServerErrorsCriterion(),
+                        new RejectThrottlingErrorsCriterion(),
+                        new RejectUnknownErrorsCriterion(),
+                        new AlwaysAcceptCriterion());
 
                     config.AddResponseTransform(new GzipBodyTransform());
                 });
