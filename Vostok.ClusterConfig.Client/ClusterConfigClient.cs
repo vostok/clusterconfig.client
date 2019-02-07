@@ -32,6 +32,9 @@ namespace Vostok.ClusterConfig.Client
             ArrayMergeStyle = ArrayMergeStyle.Replace
         };
 
+        private static readonly Lazy<ClusterConfigClient> DefaultClient
+            = new Lazy<ClusterConfigClient>(() => new ClusterConfigClient(), LazyThreadSafetyMode.PublicationOnly);
+
         private readonly ClusterConfigClientSettings settings;
         private readonly CancellationTokenSource cancellationSource;
         private readonly AtomicInt clientState;
@@ -64,6 +67,11 @@ namespace Vostok.ClusterConfig.Client
             : this(DefaultSettingsProvider.Settings)
         {
         }
+
+        /// <summary>
+        /// Returns a singleton instance of <see cref="ClusterConfigClient"/> with default settings obtained with <see cref="DefaultSettingsProvider"/>.
+        /// </summary>
+        public static ClusterConfigClient Default => DefaultClient.Value;
 
         /// <summary>
         /// Returns the zone this client is operating in.
