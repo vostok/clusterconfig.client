@@ -8,21 +8,21 @@ namespace Vostok.ClusterConfig.Client.Helpers
 {
     internal class RemoteTree
     {
-        private readonly byte[] serialized;
         private readonly ITreeSerializer serializer;
 
         public RemoteTree(byte[] serialized, ITreeSerializer serializer)
         {
-            this.serialized = serialized;
+            Serialized = serialized;
+
             this.serializer = serializer;
         }
 
-        public int Size => serialized?.Length ?? 0;
+        public int Size => Serialized?.Length ?? 0;
 
-        public byte[] Serialized => serialized;
+        public byte[] Serialized { get; }
 
         [CanBeNull]
         public ISettingsNode GetSettings(ClusterConfigPath path)
-            => serializer.Deserialize(new BinaryBufferReader(serialized, 0), path.Segments);
+            => serializer.Deserialize(new BinaryBufferReader(Serialized, 0), path.Segments);
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
@@ -121,7 +122,16 @@ namespace Vostok.ClusterConfig.Client
         }
 
         private static (ISettingsNode settings, long version) GetSettings([NotNull] ClusterConfigClientState state, ClusterConfigPath path)
-            => (TreeExtractor.Extract(state, path), state.Version);
+        {
+            try
+            {
+                return (TreeExtractor.Extract(state, path), state.Version);
+            }
+            catch (Exception error)
+            {
+                throw new ClusterConfigClientException($"Failed to extract subtree by path '{path}'.", error);
+            }
+        }
 
         [NotNull]
         private ClusterConfigClientState ObtainState()
@@ -163,21 +173,20 @@ namespace Vostok.ClusterConfig.Client
 
         private async Task PeriodicUpdatesLoop(CancellationToken cancellationToken)
         {
-            var localUpdater = CreateLocalUpdater();
+            var localUpdater = CreateLocalUpdater(out var localFolder);
             var remoteUpdater = CreateRemoteUpdater();
 
             var lastLocalResult = null as LocalUpdateResult;
             var lastRemoteResult = null as RemoteUpdateResult;
 
-            log.Info(
-                "Starting updates for zone {Zone} with period {Period}. " +
-                "Local settings enabled = {EnableLocalSettings} (folder = {LocalFolder}). " +
-                "Cluster settings enabled = {EnableClusterSettings}.",
-                settings.Zone,
-                settings.UpdatePeriod,
-                settings.EnableLocalSettings,
-                settings.LocalFolder,
-                settings.EnableClusterSettings);
+            log.Info("Starting updates for zone '{Zone}' with period {Period}.", 
+                settings.Zone, settings.UpdatePeriod);
+
+            log.Info("Local settings enabled = {EnableLocalSettings}. Local folder = '{LocalFolder}'.",
+                settings.EnableLocalSettings, localFolder?.FullName);
+
+            log.Info("Cluster settings enabled = {EnableClusterSettings}. Request timeout = {RequestTimeout}.", 
+                settings.EnableClusterSettings, settings.RequestTimeout);
 
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -213,7 +222,7 @@ namespace Vostok.ClusterConfig.Client
             }
         }
 
-        private LocalUpdater CreateLocalUpdater()
+        private LocalUpdater CreateLocalUpdater(out DirectoryInfo localFolder)
         {
             if (settings.EnableLocalSettings)
             {
@@ -226,13 +235,12 @@ namespace Vostok.ClusterConfig.Client
 
                 var zoneParser = new ZoneParser(fileParser);
 
-                var localFolder = FolderLocator.Locate(AppDomain.CurrentDomain.BaseDirectory, settings.LocalFolder, 3);
-
-                if (settings.EnableLocalSettings)
-                    log.Info("Resolved local settings directory path to '{LocalFolder}'.", localFolder.FullName);
+                localFolder = FolderLocator.Locate(AppDomain.CurrentDomain.BaseDirectory, settings.LocalFolder, 3);
 
                 return new LocalUpdater(true, localFolder, zoneParser);
             }
+
+            localFolder = null;
 
             return new LocalUpdater(false, null, null);
         }
