@@ -9,7 +9,6 @@ using Vostok.ClusterConfig.Core.Parsers;
 using Vostok.Commons.Collections;
 using Vostok.Commons.Threading;
 using Vostok.Commons.Time;
-using Vostok.Configuration.Abstractions.Merging;
 using Vostok.Configuration.Abstractions.SettingsTree;
 using Vostok.Configuration.Sources.Extensions.Observable;
 using Vostok.Logging.Abstractions;
@@ -25,12 +24,6 @@ namespace Vostok.ClusterConfig.Client
         private const int State_NotStarted = 1;
         private const int State_Started = 2;
         private const int State_Disposed = 3;
-
-        private static readonly SettingsMergeOptions DefaultMergeOptions = new SettingsMergeOptions
-        {
-            ObjectMergeStyle = ObjectMergeStyle.Deep,
-            ArrayMergeStyle = ArrayMergeStyle.Replace
-        };
 
         private static readonly Lazy<ClusterConfigClient> DefaultClient
             = new Lazy<ClusterConfigClient>(() => new ClusterConfigClient(), LazyThreadSafetyMode.PublicationOnly);
@@ -127,19 +120,7 @@ namespace Vostok.ClusterConfig.Client
         }
 
         private static (ISettingsNode settings, long version) GetSettings([NotNull] ClusterConfigClientState state, ClusterConfigPath path)
-        {
-            var settings = state.Cache.Obtain(
-                path,
-                p =>
-                {
-                    var remoteSettings = state.RemoteTree?.GetSettings(p);
-                    var localSettings = state.LocalTree?.ScopeTo(p.Segments);
-
-                    return SettingsNodeMerger.Merge(remoteSettings, localSettings, DefaultMergeOptions);
-                });
-
-            return (settings, state.Version);
-        }
+            => (TreeExtractor.Extract(state, path), state.Version);
 
         [NotNull]
         private ClusterConfigClientState ObtainState()
