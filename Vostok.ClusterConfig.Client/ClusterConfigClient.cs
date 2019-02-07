@@ -126,7 +126,7 @@ namespace Vostok.ClusterConfig.Client
             }
         }
 
-        private static (ISettingsNode settings, long version) GetSettings(ClusterConfigClientState state, ClusterConfigPath path)
+        private static (ISettingsNode settings, long version) GetSettings([NotNull] ClusterConfigClientState state, ClusterConfigPath path)
         {
             var settings = state.Cache.Obtain(
                 path,
@@ -141,6 +141,7 @@ namespace Vostok.ClusterConfig.Client
             return (settings, state.Version);
         }
 
+        [NotNull]
         private ClusterConfigClientState ObtainState()
         {
             InitiatePeriodicUpdates();
@@ -148,6 +149,7 @@ namespace Vostok.ClusterConfig.Client
             return stateSource.Task.GetAwaiter().GetResult();
         }
 
+        [NotNull]
         private Task<ClusterConfigClientState> ObtainStateAsync()
         {
             InitiatePeriodicUpdates();
@@ -155,6 +157,7 @@ namespace Vostok.ClusterConfig.Client
             return stateSource.Task;
         }
 
+        [NotNull]
         private IObservable<ClusterConfigClientState> ObtainStateObservable()
         {
             InitiatePeriodicUpdates();
