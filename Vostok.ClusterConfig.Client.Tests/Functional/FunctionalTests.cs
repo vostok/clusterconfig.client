@@ -141,6 +141,34 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             VerifyResults("foo", 2, remoteTree2["foo"]);
         }
 
+        [Test]
+        public void Should_merge_local_and_remote_trees()
+        {
+            folder.CreateFile("local", b => b.Append("value-1"));
+
+            server.SetResponse(remoteTree1, version1);
+
+            VerifyResults(default, 1, remoteTree1.Merge(localTree1));
+        }
+
+        [Test]
+        public void Should_reflect_changes_in_both_local_and_remote_trees_at_the_same_time()
+        {
+            folder.CreateFile("local", b => b.Append("value-1"));
+
+            server.SetResponse(remoteTree1, version1);
+
+            VerifyResults(default, 1, remoteTree1.Merge(localTree1));
+
+            server.SetResponse(remoteTree2, version2);
+
+            VerifyResults(default, 2, remoteTree2.Merge(localTree1));
+
+            folder.CreateFile("local", b => b.Append("value-2"));
+
+            VerifyResults(default, 3, remoteTree2.Merge(localTree2));
+        }
+
         private void VerifyResults(ClusterConfigPath path, int expectedVersion, ISettingsNode expectedTree)
         {
             Action assertion = () =>
