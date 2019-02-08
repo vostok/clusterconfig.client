@@ -117,7 +117,7 @@ namespace Vostok.ClusterConfig.Client
             {
                 cancellationSource.Cancel();
 
-                PropagateError(new ObjectDisposedException(GetType().Name));
+                PropagateError(new ObjectDisposedException(GetType().Name), true);
             }
         }
 
@@ -215,7 +215,7 @@ namespace Vostok.ClusterConfig.Client
                     log.Warn(error, "Periodical settings update has failed.");
 
                     if (currentState == null)
-                        PropagateError(new ClusterConfigClientException("Failure in initial settings update.", error));
+                        PropagateError(new ClusterConfigClientException("Failure in initial settings update.", error), false);
                 }
 
                 await Task.Delay(budget.Remaining, cancellationToken).ConfigureAwait(false);
@@ -289,7 +289,7 @@ namespace Vostok.ClusterConfig.Client
             Task.Run(
                 () =>
                 {
-                    // (iloktionov): Ref check on the state under lock prevent reordering of async observer notifications.
+                    // (iloktionov): Ref check on the state under lock prevents reordering of async observer notifications.
                     // (iloktionov): Older ones may get lost in the event of a race, but that's acceptable.
                     lock (observablePropagationLock)
                     {
@@ -299,9 +299,10 @@ namespace Vostok.ClusterConfig.Client
                 });
         }
 
-        private void PropagateError([NotNull] Exception error)
+        private void PropagateError([NotNull] Exception error, bool alwaysPushToObservable)
         {
-            if (stateSource.TrySetException(error))
+            var pushedToSource = stateSource.TrySetException(error);
+            if (pushedToSource || alwaysPushToObservable)
                 Task.Run(() => stateObservable.Error(error));
         }
     }
