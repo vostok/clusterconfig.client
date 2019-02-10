@@ -111,8 +111,8 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
         private Request CreateRequest(DateTime? lastVersion)
         {
-            var request = Request.Get("v1/zone")
-                .WithAdditionalQueryParameter("name", zone)
+            var request = Request.Get("_v1/zone")
+                .WithAdditionalQueryParameter("zoneName", zone)
                 .WithAcceptHeader("application/octet-stream")
                 .WithAcceptEncodingHeader("gzip");
 
