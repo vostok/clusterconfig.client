@@ -12,8 +12,6 @@ using Vostok.ClusterConfig.Client.Exceptions;
 using Vostok.ClusterConfig.Client.Helpers;
 using Vostok.ClusterConfig.Client.Updaters;
 using Vostok.ClusterConfig.Core.Serialization;
-using Vostok.Commons.Binary;
-using Vostok.Configuration.Abstractions.SettingsTree;
 using Vostok.Logging.Abstractions;
 using Vostok.Logging.Console;
 
