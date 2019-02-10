@@ -12,8 +12,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
     [TestFixture]
     internal class LocalUpdater_Tests
     {
-        private ISettingsNode previousTree;
-        private ISettingsNode parsedTree;
+        private ObjectNode previousTree;
+        private ObjectNode parsedTree;
         private IZoneParser zoneParser;
         private DirectoryInfo folder;
         private LocalUpdater enabledUpdater;
@@ -22,8 +22,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         [SetUp]
         public void TestSetup()
         {
-            previousTree = Substitute.For<ISettingsNode>();
-            parsedTree = Substitute.For<ISettingsNode>();
+            previousTree = new ObjectNode("tree1");
+            parsedTree = new ObjectNode("tree2");
 
             zoneParser = Substitute.For<IZoneParser>();
             zoneParser.Parse(Arg.Any<DirectoryInfo>()).Returns(_ => parsedTree);

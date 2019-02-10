@@ -80,14 +80,20 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
                 null,
                 new ISettingsNode[]
                 {
-                    new ValueNode("local", "value-1")
+                    new ObjectNode("local", new ISettingsNode[]
+                    {
+                        new ValueNode(string.Empty, "value-1")
+                    }),
                 });
 
             localTree2 = new ObjectNode(
                 null,
                 new ISettingsNode[]
                 {
-                    new ValueNode("local", "value-2")
+                    new ObjectNode("local", new ISettingsNode[]
+                    {
+                        new ValueNode(string.Empty, "value-2")
+                    }),
                 });
 
             version1 = new DateTime(1990, 12, 1, 13, 5, 45);
