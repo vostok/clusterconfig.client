@@ -2,11 +2,16 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
+using JetBrains.Annotations;
 using Vostok.Clusterclient.Core.Topology;
 
 namespace Vostok.ClusterConfig.Client.Helpers
 {
-    internal class DnsClusterProvider : IClusterProvider
+    /// <summary>
+    /// Resolves given DNS name to (potentially) multiple IP addresses and returns a replica for each of them.
+    /// </summary>
+    [PublicAPI]
+    public class DnsClusterProvider : IClusterProvider
     {
         private static readonly Uri[] EmptyCluster = {};
 
