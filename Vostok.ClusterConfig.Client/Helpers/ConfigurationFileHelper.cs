@@ -36,10 +36,8 @@ namespace Vostok.ClusterConfig.Client.Helpers
             }
             else
             {
-                int port = default;
-
                 var foundDns = TryGet(content, "ServerDNS", out var dns);
-                var foundPort = TryGet(content, "ServerPort", int.TryParse, out port);
+                var foundPort = TryGet(content, "ServerPort", int.TryParse, out int port);
 
                 if (foundDns || foundPort)
                 {

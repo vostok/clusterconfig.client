@@ -4,7 +4,6 @@ using System.Reactive;
 using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using FluentAssertions;
 using FluentAssertions.Extensions;
 using NUnit.Framework;
