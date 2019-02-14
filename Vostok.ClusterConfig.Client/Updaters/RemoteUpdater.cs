@@ -63,7 +63,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
                     return HandleNotModifiedResponse(lastResult);
 
                 case ResponseCode.Ok:
-                    return HandleSuccessResponse(lastResult, requestResult.Response);
+                    return HandleSuccessResponse(lastResult, requestResult.Response, requestResult.Replica);
             }
 
             throw NoAcceptableResponseException(requestResult);
@@ -169,7 +169,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
         }
 
         [NotNull]
-        private RemoteUpdateResult HandleSuccessResponse(RemoteUpdateResult lastUpdateResult, Response response)
+        private RemoteUpdateResult HandleSuccessResponse(RemoteUpdateResult lastUpdateResult, Response response, Uri replica)
         {
             if (!response.HasContent)
                 throw Empty200ResponseException();
@@ -189,7 +189,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
             var tree = new RemoteTree(response.Content.ToArray(), TreeSerializers.V1);
 
-            LogReceivedNewZone(tree, version);
+            LogReceivedNewZone(tree, version, replica);
 
             return new RemoteUpdateResult(true, tree, version);
         }
@@ -206,8 +206,9 @@ namespace Vostok.ClusterConfig.Client.Updaters
             => log.Warn("Received response for zone '{Zone}' with stale version '{StaleVersion}'. Current version = '{CurrentVersion}'. Will not update.",
                 zone, staleVersion, currentVersion);
 
-        private void LogReceivedNewZone(RemoteTree tree, DateTime version)
-            => log.Info("Received new version of zone '{Zone}'. Size = {Size}. Version = {Version}.", zone, tree.Size, version.ToString("R"));
+        private void LogReceivedNewZone(RemoteTree tree, DateTime version, Uri replica)
+            => log.Info("Received new version of zone '{Zone}' from {Replica}. Size = {Size}. Version = {Version}.", 
+                zone, replica?.Authority, tree.Size, version.ToString("R"));
 
         #endregion
 
