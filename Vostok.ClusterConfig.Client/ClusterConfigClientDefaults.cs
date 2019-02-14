@@ -23,7 +23,7 @@ namespace Vostok.ClusterConfig.Client
 
         public const int MaximumFileSize = 1024 * 1024;
 
-        public static readonly TimeSpan UpdatePeriod = TimeSpan.FromSeconds(20);
+        public static readonly TimeSpan UpdatePeriod = TimeSpan.FromSeconds(10);
 
         public static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
     }
