@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -176,7 +177,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             if (response.Headers.LastModified == null)
                 throw MissingLastModifiedHeaderException();
 
-            var version = DateTime.Parse(response.Headers.LastModified).ToUniversalTime();
+            var version = DateTime.Parse(response.Headers.LastModified, null, DateTimeStyles.AssumeUniversal).ToUniversalTime();
 
             if (lastUpdateResult != null && version <= lastUpdateResult.Version)
             {
