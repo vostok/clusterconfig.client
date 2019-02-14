@@ -3,6 +3,8 @@ using System.IO;
 using System.Text;
 using System.Threading;
 
+// ReSharper disable AssignNullToNotNullAttribute
+
 namespace Vostok.ClusterConfig.Client.Tests.Functional
 {
     internal class TestFolder : IDisposable

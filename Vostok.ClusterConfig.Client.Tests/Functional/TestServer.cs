@@ -2,7 +2,6 @@
 using System.IO;
 using System.IO.Compression;
 using System.Net;
-using System.Threading;
 using System.Threading.Tasks;
 using Vostok.Clusterclient.Core.Model;
 using Vostok.ClusterConfig.Core.Serialization;
