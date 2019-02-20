@@ -8,6 +8,7 @@ using Vostok.ClusterConfig.Client.Helpers;
 using Vostok.ClusterConfig.Client.Updaters;
 using Vostok.ClusterConfig.Core.Parsers;
 using Vostok.Commons.Collections;
+using Vostok.Commons.Helpers.Observable;
 using Vostok.Commons.Threading;
 using Vostok.Commons.Time;
 using Vostok.Configuration.Abstractions.SettingsTree;
