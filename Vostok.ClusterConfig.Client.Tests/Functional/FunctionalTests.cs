@@ -52,7 +52,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
                 LocalFolder = folder.Directory.FullName,
                 Cluster = new FixedClusterProvider(new Uri(server.Url)),
                 UpdatePeriod = 250.Milliseconds(),
-                Log = new ConsoleLog()
+                Log = new SynchronousConsoleLog()
             };
 
             client = new ClusterConfigClient(settings);
@@ -105,8 +105,6 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             client.Dispose();
             folder.Dispose();
             server.Dispose();
-
-            ConsoleLog.Flush();
         }
 
         [Test]
