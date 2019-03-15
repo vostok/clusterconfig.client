@@ -23,6 +23,7 @@
     <PackageProjectUrl>https://github.com/vostok/clusterconfig.client</PackageProjectUrl>
     <PackageLicenseUrl>https://github.com/vostok/clusterconfig.client/blob/master/LICENSE</PackageLicenseUrl>
     <PackageTags>vostok vostok.clusterconfig</PackageTags>
+    <PackageReleaseNotes>https://github.com/vostok/clusterconfig.client/blob/master/CHANGELOG.md</PackageReleaseNotes>
     <RepositoryUrl>https://github.com/vostok/clusterconfig.client</RepositoryUrl>
   </PropertyGroup>
 
