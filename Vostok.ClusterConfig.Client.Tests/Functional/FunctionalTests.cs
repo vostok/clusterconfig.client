@@ -232,7 +232,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         {
             settings.EnableLocalSettings = false;
 
-            settings.Cluster = new FixedClusterProvider();
+            settings.Cluster = new FixedClusterProvider(Array.Empty<string>());
 
             VerifyResults(default, 1, null);
         }
@@ -240,7 +240,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         [Test]
         public void Should_return_null_tree_when_there_are_no_replicas_with_local_settings()
         {
-            settings.Cluster = new FixedClusterProvider();
+            settings.Cluster = new FixedClusterProvider(Array.Empty<string>());
 
             VerifyResults(default, 1, new ObjectNode(null, null));
         }
