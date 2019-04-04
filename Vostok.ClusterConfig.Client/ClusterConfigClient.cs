@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -247,7 +247,13 @@ namespace Vostok.ClusterConfig.Client
         }
 
         private RemoteUpdater CreateRemoteUpdater()
-            => new RemoteUpdater(settings.EnableClusterSettings, settings.Cluster, log, settings.Zone, settings.RequestTimeout);
+            => new RemoteUpdater(
+                settings.EnableClusterSettings,
+                settings.Cluster,
+                settings.AdditionalSetup,
+                log,
+                settings.Zone,
+                settings.RequestTimeout);
 
         [CanBeNull]
         private ClusterConfigClientState GetCurrentState()

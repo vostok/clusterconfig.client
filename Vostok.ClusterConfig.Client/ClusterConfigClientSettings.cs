@@ -1,5 +1,6 @@
 ﻿using System;
 using JetBrains.Annotations;
+using Vostok.Clusterclient.Core;
 using Vostok.Clusterclient.Core.Topology;
 using Vostok.ClusterConfig.Client.Helpers;
 using Vostok.Logging.Abstractions;
@@ -69,5 +70,11 @@ namespace Vostok.ClusterConfig.Client
         /// <para>Only relevant when <see cref="EnableLocalSettings"/> is set to <c>true</c>.</para>
         /// </summary>
         public int MaximumFileSize { get; set; } = ClusterConfigClientDefaults.MaximumFileSize;
+        
+        /// <summary>
+        /// <para>An optional delegate that can be used to tune underlying <see cref="IClusterClient"/> instance.</para>
+        /// </summary>
+        [CanBeNull]
+        public ClusterClientSetup AdditionalSetup { get; set; }
     }
 }
