@@ -36,8 +36,8 @@ namespace Vostok.ClusterConfig.Client.Updaters
             this.zone = zone;
         }
 
-        public RemoteUpdater(bool enabled, IClusterProvider cluster, ILog log, string zone, TimeSpan timeout)
-            : this(enabled, enabled ? CreateClient(cluster, log, timeout) : null, log, zone)
+        public RemoteUpdater(bool enabled, IClusterProvider cluster, ClusterClientSetup setup, ILog log, string zone, TimeSpan timeout)
+            : this(enabled, enabled ? CreateClient(cluster, setup, log, timeout) : null, log, zone)
         {
         }
 
@@ -69,7 +69,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             throw NoAcceptableResponseException(requestResult);
         }
 
-        private static ClusterClient CreateClient(IClusterProvider cluster, ILog log, TimeSpan timeout)
+        private static ClusterClient CreateClient(IClusterProvider cluster, ClusterClientSetup setup, ILog log, TimeSpan timeout)
         {
             return new ClusterClient(
                 log.WithMinimumLevel(LogLevel.Warn),
@@ -104,6 +104,8 @@ namespace Vostok.ClusterConfig.Client.Updaters
                         new AlwaysAcceptCriterion());
 
                     config.AddResponseTransform(new GzipBodyTransform());
+                    
+                    setup?.Invoke(config);
                 });
         }
 
