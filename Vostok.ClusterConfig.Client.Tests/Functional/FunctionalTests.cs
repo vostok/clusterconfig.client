@@ -110,7 +110,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         [Test]
         public void Should_receive_local_tree_when_server_settings_are_disabled()
         {
-            settings.EnableClusterSettings = false;
+            ModifySettings(s => s.EnableClusterSettings = false);
 
             folder.CreateFile("local", b => b.Append("value-1"));
 
@@ -121,7 +121,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         [Test]
         public void Should_reflect_updates_in_local_tree_when_server_settings_are_disabled()
         {
-            settings.EnableClusterSettings = false;
+            ModifySettings(s => s.EnableClusterSettings = false);
 
             folder.CreateFile("local", b => b.Append("value-1"));
 
@@ -139,7 +139,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         [Test]
         public void Should_receive_remote_tree_when_local_settings_are_disabled()
         {
-            settings.EnableLocalSettings = false;
+            ModifySettings(s => s.EnableLocalSettings = false);
 
             server.SetResponse(remoteTree1, version1);
 
@@ -150,7 +150,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         [Test]
         public void Should_reflect_updates_in_remote_tree_when_local_settings_are_disabled()
         {
-            settings.EnableLocalSettings = false;
+            ModifySettings(s => s.EnableLocalSettings = false);
 
             server.SetResponse(remoteTree1, version1);
 
@@ -194,8 +194,11 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         [Test]
         public void Should_return_null_tree_when_everything_is_disabled()
         {
-            settings.EnableLocalSettings = false;
-            settings.EnableClusterSettings = false;
+            ModifySettings(s =>
+            {
+                s.EnableLocalSettings = false;
+                s.EnableClusterSettings = false;
+            });
 
             VerifyResults(default, 1, null);
             VerifyResults("foo/bar", 1, null);
@@ -212,7 +215,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         [Test]
         public void Should_return_null_tree_when_requesting_missing_zone_without_local_settings()
         {
-            settings.EnableLocalSettings = false;
+            ModifySettings(s => s.EnableLocalSettings = false);
 
             server.SetResponse(ResponseCode.NotFound);
 
@@ -230,9 +233,11 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         [Test]
         public void Should_return_null_tree_when_there_are_no_replicas_without_local_settings()
         {
-            settings.EnableLocalSettings = false;
-
-            settings.Cluster = new FixedClusterProvider(Array.Empty<string>());
+            ModifySettings(s =>
+            {
+                s.EnableLocalSettings = false;
+                s.Cluster = new FixedClusterProvider(Array.Empty<string>());
+            });
 
             VerifyResults(default, 1, null);
         }
@@ -240,7 +245,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         [Test]
         public void Should_return_null_tree_when_there_are_no_replicas_with_local_settings()
         {
-            settings.Cluster = new FixedClusterProvider(Array.Empty<string>());
+            ModifySettings(s => s.Cluster = new FixedClusterProvider(Array.Empty<string>()));
 
             VerifyResults(default, 1, new ObjectNode(null, null));
         }
@@ -499,6 +504,13 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 
                 assertion.ShouldPassIn(5.Seconds());
             }
+        }
+
+        private void ModifySettings(Action<ClusterConfigClientSettings> modify)
+        {
+            modify(settings);
+
+            client = new ClusterConfigClient(settings);
         }
 
         private void VerifyResults(ClusterConfigPath path, int expectedVersion, ISettingsNode expectedTree, bool includeObservables = true)

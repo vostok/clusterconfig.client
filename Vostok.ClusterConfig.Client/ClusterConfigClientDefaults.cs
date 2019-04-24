@@ -1,5 +1,7 @@
 ﻿using System;
 using JetBrains.Annotations;
+using Vostok.Clusterclient.Core.Topology;
+using Vostok.ClusterConfig.Client.Helpers;
 
 namespace Vostok.ClusterConfig.Client
 {
@@ -26,5 +28,7 @@ namespace Vostok.ClusterConfig.Client
         public static readonly TimeSpan UpdatePeriod = TimeSpan.FromSeconds(10);
 
         public static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
+
+        public static readonly IClusterProvider Cluster = new DnsClusterProvider(Dns, Port);
     }
 }

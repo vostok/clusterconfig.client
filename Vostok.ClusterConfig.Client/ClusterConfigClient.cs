@@ -41,11 +41,11 @@ namespace Vostok.ClusterConfig.Client
         private CachingObservable<ClusterConfigClientState> stateObservable;
 
         /// <summary>
-        /// Creates a new instance of <see cref="ClusterConfigClient"/> with given <paramref name="settings"/>.
+        /// Creates a new instance of <see cref="ClusterConfigClient"/> with given <paramref name="settings"/> merged with default settings from <see cref="DefaultSettingsProvider"/> (non-default user settings take priority).
         /// </summary>
         public ClusterConfigClient([NotNull] ClusterConfigClientSettings settings)
         {
-            this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            this.settings = settings = ConfigurationMerger.Merge(DefaultSettingsProvider.Settings, settings ?? throw new ArgumentNullException(nameof(settings)));
 
             log = settings.Log.ForContext<ClusterConfigClient>();
 
