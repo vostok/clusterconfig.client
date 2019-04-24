@@ -1,24 +1,19 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
-
   <Import Project="..\..\vostok.devtools\library-common-props\Main-Project.props" />
   <Import Project="..\..\vostok.devtools\git-commit-to-assembly-title\Vostok.Tools.GitCommit2AssemblyTitle.props" />
-
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <Configurations>Debug;Release</Configurations>
     <LangVersion>7.2</LangVersion>
   </PropertyGroup>
-
   <PropertyGroup>
-    <VersionPrefix>0.1.1</VersionPrefix>
+    <VersionPrefix>0.1.2</VersionPrefix>
   </PropertyGroup>
-
   <PropertyGroup>
     <Title>Vostok.ClusterConfig.Client</Title>
     <Description>An implementation of ClusterConfig client.</Description>
   </PropertyGroup>
-
   <PropertyGroup>
     <PackageProjectUrl>https://github.com/vostok/clusterconfig.client</PackageProjectUrl>
     <PackageLicenseUrl>https://github.com/vostok/clusterconfig.client/blob/master/LICENSE</PackageLicenseUrl>
@@ -26,48 +21,39 @@
     <PackageReleaseNotes>https://github.com/vostok/clusterconfig.client/blob/master/CHANGELOG.md</PackageReleaseNotes>
     <RepositoryUrl>https://github.com/vostok/clusterconfig.client</RepositoryUrl>
   </PropertyGroup>
-
   <ItemGroup>
     <Reference Include="Vostok.ClusterConfig.Client.Abstractions">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\vostok.clusterconfig.client.abstractions\Vostok.ClusterConfig.Client.Abstractions\bin\Release\netstandard2.0\Vostok.ClusterConfig.Client.Abstractions.dll</HintPath>
     </Reference>
-
     <Reference Include="Vostok.Configuration.Abstractions">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\vostok.configuration.abstractions\Vostok.Configuration.Abstractions\bin\Release\netstandard2.0\Vostok.Configuration.Abstractions.dll</HintPath>
     </Reference>
-
     <Reference Include="Vostok.Configuration.Sources">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\vostok.configuration.sources\Vostok.Configuration.Sources\bin\Release\netstandard2.0\Vostok.Configuration.Sources.dll</HintPath>
     </Reference>
-
     <Reference Include="Vostok.ClusterClient.Transport">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\vostok.clusterclient.transport\Vostok.ClusterClient.Transport\bin\Release\netstandard2.0\Vostok.ClusterClient.Transport.dll</HintPath>
     </Reference>
-
     <Reference Include="Vostok.ClusterClient.Core">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\vostok.clusterclient.core\Vostok.ClusterClient.Core\bin\Release\netstandard2.0\Vostok.ClusterClient.Core.dll</HintPath>
     </Reference>
-
     <Reference Include="Vostok.Logging.Abstractions">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\vostok.logging.abstractions\Vostok.Logging.Abstractions\bin\Release\netstandard2.0\Vostok.Logging.Abstractions.dll</HintPath>
     </Reference>
   </ItemGroup>
-
   <ItemGroup>
     <Compile Include="..\..\vostok.commons.collections\Vostok.Commons.Collections\RecyclingBoundedCache.cs" Link="Commons\RecyclingBoundedCache.cs" />
     <Compile Include="..\..\vostok.commons.threading\Vostok.Commons.Threading\AtomicInt.cs" Link="Commons\AtomicInt.cs" />
     <Compile Include="..\..\vostok.commons.time\Vostok.Commons.Time\TimeBudget.cs" Link="Commons\TimeBudget.cs" />
     <Compile Include="..\..\vostok.commons.helpers\Vostok.Commons.Helpers\Observable\CachingObservable.cs" Link="Commons\CachingObservable.cs" />
   </ItemGroup>
-
   <Import Project="..\..\vostok.commons.binary\BinaryBufferReader.props" />
   <Import Project="..\..\vostok.commons.binary\BinaryBufferWriter.props" />
   <Import Project="..\..\vostok.clusterconfig.core\Vostok.ClusterConfig.Core.props" />
-
 </Project>
