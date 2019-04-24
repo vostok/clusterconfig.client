@@ -186,6 +186,10 @@ namespace Vostok.ClusterConfig.Client.Tests
                 {
                     Thread.Sleep(200);
                 }
+                catch (IOException)
+                {
+                    Thread.Sleep(200);
+                }
             }
         }
 

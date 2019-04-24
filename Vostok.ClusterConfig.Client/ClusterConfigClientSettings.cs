@@ -2,7 +2,6 @@
 using JetBrains.Annotations;
 using Vostok.Clusterclient.Core;
 using Vostok.Clusterclient.Core.Topology;
-using Vostok.ClusterConfig.Client.Helpers;
 using Vostok.Logging.Abstractions;
 
 namespace Vostok.ClusterConfig.Client
@@ -40,9 +39,7 @@ namespace Vostok.ClusterConfig.Client
         /// <para>Gets or sets the cluster of remote replicas used to query settings.</para>
         /// <para>Only relevant when <see cref="EnableClusterSettings"/> is set to <c>true</c>.</para>
         /// </summary>
-        public IClusterProvider Cluster { get; set; } = new DnsClusterProvider(
-            ClusterConfigClientDefaults.Dns, 
-            ClusterConfigClientDefaults.Port);
+        public IClusterProvider Cluster { get; set; } = ClusterConfigClientDefaults.Cluster;
 
         /// <summary>
         /// Gets or sets the period of data updates. It affects both remote queries and local folder checks.
