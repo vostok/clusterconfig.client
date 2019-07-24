@@ -4,7 +4,7 @@ namespace Vostok.ClusterConfig.Client.Helpers
 {
     internal static class FolderLocator
     {
-        public static DirectoryInfo Locate(string from, string relativePath, int maxOutwardHops)
+        public static DirectoryInfo Locate(string from, string relativePath, int maxOutwardHops = 10)
         {
             if (relativePath == Path.GetFullPath(relativePath))
                 return new DirectoryInfo(relativePath);

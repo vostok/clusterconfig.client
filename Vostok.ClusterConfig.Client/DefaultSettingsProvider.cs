@@ -35,7 +35,7 @@ namespace Vostok.ClusterConfig.Client
         {
             try
             {
-                var folder = FolderLocator.Locate(AppDomain.CurrentDomain.BaseDirectory, ClusterConfigClientDefaults.LocalFolder, 3);
+                var folder = FolderLocator.Locate(AppDomain.CurrentDomain.BaseDirectory, ClusterConfigClientDefaults.LocalFolder);
                 if (!folder.Exists)
                     return Default;
 
