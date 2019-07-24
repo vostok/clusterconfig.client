@@ -236,7 +236,7 @@ namespace Vostok.ClusterConfig.Client
 
                 var zoneParser = new ZoneParser(fileParser);
 
-                localFolder = FolderLocator.Locate(AppDomain.CurrentDomain.BaseDirectory, settings.LocalFolder, 3);
+                localFolder = FolderLocator.Locate(AppDomain.CurrentDomain.BaseDirectory, settings.LocalFolder);
 
                 return new LocalUpdater(true, localFolder, zoneParser);
             }
