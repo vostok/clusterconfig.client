@@ -281,7 +281,7 @@ namespace Vostok.ClusterConfig.Client
                 if (cancellationToken.IsCancellationRequested)
                     return;
 
-                var newStateSource = new TaskCompletionSource<ClusterConfigClientState>();
+                var newStateSource = new TaskCompletionSource<ClusterConfigClientState>(TaskCreationOptions.RunContinuationsAsynchronously);
 
                 newStateSource.SetResult(state);
 
