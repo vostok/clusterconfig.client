@@ -385,7 +385,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             {
                 VerifyError();
 
-                observer.Messages.Should().ContainSingle().Which.Kind.Should().Be(NotificationKind.OnError);
+                VerifyObserverCaughtError();
             }
 
             observer = new TestObserver<(ISettingsNode, long)>();
@@ -393,7 +393,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             // (iloktionov): Resubscribe should fail immediately:
             using (client.ObserveWithVersions(default).Subscribe(observer))
             {
-                observer.Messages.Should().ContainSingle().Which.Kind.Should().Be(NotificationKind.OnError);
+                VerifyObserverCaughtError();
             }
         }
 
@@ -442,7 +442,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             {
                 VerifyError();
 
-                observer.Messages.Should().ContainSingle().Which.Kind.Should().Be(NotificationKind.OnError);
+                VerifyObserverCaughtError();
             }
 
             server.SetResponse(remoteTree1, version1);
@@ -571,6 +571,13 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         private void VerifyNotifications(params Notification<(ISettingsNode, long)>[] expected)
         {
             Action assertion = () => observer.Messages.Should().Equal(expected);
+
+            assertion.ShouldPassIn(10.Seconds());
+        }
+
+        private void VerifyObserverCaughtError()
+        {
+            Action assertion = () => observer.Messages.Should().ContainSingle().Which.Kind.Should().Be(NotificationKind.OnError);
 
             assertion.ShouldPassIn(10.Seconds());
         }
