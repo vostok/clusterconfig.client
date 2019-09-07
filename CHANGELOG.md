@@ -1,3 +1,7 @@
+## 0.1.5 (07.09.2019):
+
+Local settings reader no longer attempts to parse `.yml`, `.yaml` and `.toml` files.
+
 ## 0.1.4 (03.08.2019):
 
 Fixed https://github.com/vostok/clusterconfig.client/issues/2
