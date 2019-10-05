@@ -1,3 +1,7 @@
+## 0.1.6 (05.10.2019)
+
+Local settings reader no longer attempts to parse `.bin` files.
+
 ## 0.1.5 (07.09.2019):
 
 Local settings reader no longer attempts to parse `.yml`, `.yaml` and `.toml` files.
