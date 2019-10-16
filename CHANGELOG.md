@@ -1,3 +1,7 @@
+## 0.1.7 (16.10.2019)
+
+Added `TrySetDefaultClient` method.
+
 ## 0.1.6 (05.10.2019)
 
 Local settings reader no longer attempts to parse `.bin` files.
