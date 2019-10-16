@@ -23,13 +23,6 @@ namespace Vostok.ClusterConfig.Client
     [PublicAPI]
     public class ClusterConfigClient : IClusterConfigClient, IDisposable
     {
-        private const int State_NotStarted = 1;
-        private const int State_Started = 2;
-        private const int State_Disposed = 3;
-
-        private static readonly Lazy<ClusterConfigClient> DefaultClient
-            = new Lazy<ClusterConfigClient>(() => new ClusterConfigClient(), LazyThreadSafetyMode.PublicationOnly);
-
         private readonly ClusterConfigClientSettings settings;
         private readonly CancellationTokenSource cancellationSource;
         private readonly AtomicInt clientState;
@@ -67,7 +60,14 @@ namespace Vostok.ClusterConfig.Client
         /// <summary>
         /// Returns a singleton instance of <see cref="ClusterConfigClient"/> with default settings obtained with <see cref="DefaultSettingsProvider"/>.
         /// </summary>
-        public static ClusterConfigClient Default => DefaultClient.Value;
+        public static ClusterConfigClient Default => DefaultClusterConfigClientProvider.Get();
+
+        /// <summary>
+        /// <para>Configures the global <see cref="Default"/> cluster config client with given instance.</para>
+        /// <para>This method returns <c>false</c> when trying to overwrite a previously configured instance.</para>
+        /// </summary>
+        public static bool TrySetDefaultClient([NotNull] ClusterConfigClient clusterConfigClient) =>
+            DefaultClusterConfigClientProvider.TryConfigure(clusterConfigClient);
 
         /// <summary>
         /// Returns the zone this client is operating in.
@@ -180,14 +180,20 @@ namespace Vostok.ClusterConfig.Client
             var lastLocalResult = null as LocalUpdateResult;
             var lastRemoteResult = null as RemoteUpdateResult;
 
-            log.Info("Starting updates for zone '{Zone}' with period {Period}.", 
-                settings.Zone, settings.UpdatePeriod);
+            log.Info(
+                "Starting updates for zone '{Zone}' with period {Period}.",
+                settings.Zone,
+                settings.UpdatePeriod);
 
-            log.Info("Local settings enabled = {EnableLocalSettings}. Local folder = '{LocalFolder}'.",
-                settings.EnableLocalSettings, localFolder?.FullName);
+            log.Info(
+                "Local settings enabled = {EnableLocalSettings}. Local folder = '{LocalFolder}'.",
+                settings.EnableLocalSettings,
+                localFolder?.FullName);
 
-            log.Info("Cluster settings enabled = {EnableClusterSettings}. Request timeout = {RequestTimeout}.", 
-                settings.EnableClusterSettings, settings.RequestTimeout);
+            log.Info(
+                "Cluster settings enabled = {EnableClusterSettings}. Request timeout = {RequestTimeout}.",
+                settings.EnableClusterSettings,
+                settings.RequestTimeout);
 
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -312,5 +318,11 @@ namespace Vostok.ClusterConfig.Client
             if (pushedToSource || alwaysPushToObservable)
                 Task.Run(() => stateObservable.Error(error));
         }
+
+        // ReSharper disable InconsistentNaming
+        private const int State_NotStarted = 1;
+        private const int State_Started = 2;
+        private const int State_Disposed = 3;
+        // ReSharper restore InconsistentNaming
     }
 }
