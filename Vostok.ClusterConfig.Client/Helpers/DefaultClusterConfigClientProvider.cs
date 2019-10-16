@@ -22,17 +22,21 @@ namespace Vostok.ClusterConfig.Client.Helpers
             }
         }
 
-        public static void Configure([NotNull] ClusterConfigClient newClient, bool canOverwrite = false)
+        public static bool TryConfigure([NotNull] ClusterConfigClient newClient)
         {
             if (newClient == null)
                 throw new ArgumentNullException(nameof(newClient));
 
+            if (client != null)
+                return false;
+
             lock (Sync)
             {
-                if (!canOverwrite && client != null)
-                    throw new InvalidOperationException("Can't overwrite existing ClusterConfigClient.");
+                if (client != null)
+                    return false;
 
                 client = newClient;
+                return true;
             }
         }
 

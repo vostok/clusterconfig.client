@@ -64,12 +64,10 @@ namespace Vostok.ClusterConfig.Client
 
         /// <summary>
         /// <para>Configures the global <see cref="Default"/> cluster config client with given instance.</para>
-        /// <para>By default, this method fails when trying to overwrite a previously configured instance. This behaviour can be changed with <paramref name="canOverwrite"/> parameter.</para>
+        /// <para>This method returns <c>false</c> when trying to overwrite a previously configured instance.</para>
         /// </summary>
-        /// <exception cref="ArgumentNullException">Provided instance was <c>null</c>.</exception>
-        /// <exception cref="InvalidOperationException">Attempted to overwrite previously configured instance.</exception>
-        public static void OverwriteDefaultClient([NotNull] ClusterConfigClient clusterConfigClient, bool canOverwrite = false) =>
-            DefaultClusterConfigClientProvider.Configure(clusterConfigClient, canOverwrite);
+        public static bool TrySetDefaultClient([NotNull] ClusterConfigClient clusterConfigClient) =>
+            DefaultClusterConfigClientProvider.TryConfigure(clusterConfigClient);
 
         /// <summary>
         /// Returns the zone this client is operating in.
