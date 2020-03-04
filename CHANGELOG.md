@@ -1,8 +1,12 @@
-## 0.1.7 (16.10.2019)
+## 0.1.8 (04.03.2020):
+
+Updated dependencies.
+
+## 0.1.7 (16.10.2019):
 
 Added `TrySetDefaultClient` method.
 
-## 0.1.6 (05.10.2019)
+## 0.1.6 (05.10.2019):
 
 Local settings reader no longer attempts to parse `.bin` files.
 
@@ -14,7 +18,7 @@ Local settings reader no longer attempts to parse `.yml`, `.yaml` and `.toml` fi
 
 Fixed https://github.com/vostok/clusterconfig.client/issues/2
 
-## 0.1.3 (24.07.2019)
+## 0.1.3 (24.07.2019):
 
 Folder for default settings is now searched up to 10 levels outwards from current directory (up from 3).
 
