@@ -47,8 +47,8 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 return CreateEmptyResult(lastResult);
 
             var request = CreateRequest(lastResult?.Version);
-
-            var requestResult = await client.SendAsync(request, cancellationToken: cancellationToken).ConfigureAwait(false);
+            var requestPriority = lastResult == null ? RequestPriority.Critical : RequestPriority.Ordinary;
+            var requestResult = await client.SendAsync(request, priority: requestPriority, cancellationToken: cancellationToken).ConfigureAwait(false);
 
             if (cancellationToken.IsCancellationRequested)
                 throw new OperationCanceledException();
