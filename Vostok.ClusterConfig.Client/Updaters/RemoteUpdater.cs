@@ -9,6 +9,7 @@ using Vostok.Clusterclient.Core.Criteria;
 using Vostok.Clusterclient.Core.Misc;
 using Vostok.Clusterclient.Core.Model;
 using Vostok.Clusterclient.Core.Ordering.Weighed;
+using Vostok.Clusterclient.Core.Retry;
 using Vostok.Clusterclient.Core.Strategies;
 using Vostok.Clusterclient.Core.Topology;
 using Vostok.Clusterclient.Transport;
@@ -47,8 +48,8 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 return CreateEmptyResult(lastResult);
 
             var request = CreateRequest(lastResult?.Version);
-
-            var requestResult = await client.SendAsync(request, cancellationToken: cancellationToken).ConfigureAwait(false);
+            var requestPriority = lastResult == null ? RequestPriority.Critical : RequestPriority.Ordinary;
+            var requestResult = await client.SendAsync(request, priority: requestPriority, cancellationToken: cancellationToken).ConfigureAwait(false);
 
             if (cancellationToken.IsCancellationRequested)
                 throw new OperationCanceledException();
@@ -104,6 +105,12 @@ namespace Vostok.ClusterConfig.Client.Updaters
                         new AlwaysAcceptCriterion());
 
                     config.AddResponseTransform(new GzipBodyTransform());
+
+                    config.RetryPolicy = new RemoteRetryPolicy();
+                    config.RetryStrategy = new LinearBackoffRetryStrategy(5, 
+                        TimeSpan.FromSeconds(5),
+                        TimeSpan.FromSeconds(15),
+                        TimeSpan.FromSeconds(3));
                     
                     setup?.Invoke(config);
                 });
