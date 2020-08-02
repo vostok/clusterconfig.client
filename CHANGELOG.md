@@ -1,4 +1,4 @@
-# 0.1.9 (02.08.2020):
+## 0.1.9 (02.08.2020):
 
 - Marked initial update requests with critical priority.
 - Added retry to initial update requests.
