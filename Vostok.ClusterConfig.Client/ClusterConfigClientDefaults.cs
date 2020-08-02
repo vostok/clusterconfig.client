@@ -27,7 +27,7 @@ namespace Vostok.ClusterConfig.Client
 
         public static readonly TimeSpan UpdatePeriod = TimeSpan.FromSeconds(10);
 
-        public static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
+        public static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(45);
 
         public static readonly IClusterProvider Cluster = new DnsClusterProvider(Dns, Port);
     }
