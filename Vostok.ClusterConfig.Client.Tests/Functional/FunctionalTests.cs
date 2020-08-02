@@ -4,6 +4,7 @@ using System.Reactive;
 using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using FluentAssertions;
 using FluentAssertions.Extensions;
 using NUnit.Framework;
@@ -295,6 +296,14 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         public void Should_throw_errors_if_initial_update_fails()
         {
             VerifyError();
+        }
+
+        [Test]
+        public void Should_retry_initial_remote_update()
+        {
+            Task.Delay(5.Seconds()).ContinueWith(_ => server.SetResponse(remoteTree1, version1));
+
+            client.Get(ClusterConfigPath.Empty).Should().NotBeNull();
         }
 
         [Test]
