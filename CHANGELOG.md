@@ -1,3 +1,8 @@
+# 0.1.9 (02.08.2020):
+
+- Marked initial update requests with critical priority.
+- Added retry to initial update requests.
+
 ## 0.1.8 (04.03.2020):
 
 Updated dependencies.
