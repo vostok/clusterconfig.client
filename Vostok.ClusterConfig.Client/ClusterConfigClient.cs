@@ -79,9 +79,7 @@ namespace Vostok.ClusterConfig.Client
         /// </summary>
         public long Version => GetCurrentState()?.Version ?? 0L;
 
-        /// <summary>
-        /// Returns <c>true</c> if initial settings update has already been completed, or <c>false</c> otherwise.
-        /// </summary>
+        /// <inheritdoc />
         public bool HasInitialized => GetCurrentState() != null;
 
         /// <inheritdoc />
