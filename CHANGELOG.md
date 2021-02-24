@@ -1,3 +1,7 @@
+## 0.1.10 (24.02.2021):
+
+Whole file parser for .md files.
+
 ## 0.1.9 (02.08.2020):
 
 - Marked initial update requests with critical priority.
