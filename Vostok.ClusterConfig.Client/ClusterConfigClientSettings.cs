@@ -23,7 +23,7 @@ namespace Vostok.ClusterConfig.Client
         public bool EnableClusterSettings { get; set; } = true;
 
         /// <summary>
-        /// Forces client to assume that CC is deployed in current environment. This settings matters only if client was unable to find any replicas of CC at startup.
+        /// Forces client to assume that CC is deployed in current environment. This forces client to throw when it was unable to find any replicas of CC.
         /// </summary>
         public bool AssumeClusterConfigDeployed { get; set; } = false;
 
