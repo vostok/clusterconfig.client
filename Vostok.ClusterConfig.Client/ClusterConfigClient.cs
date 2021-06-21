@@ -259,7 +259,8 @@ namespace Vostok.ClusterConfig.Client
                 settings.AdditionalSetup,
                 log,
                 settings.Zone,
-                settings.RequestTimeout);
+                settings.RequestTimeout,
+                settings.AssumeClusterConfigDeployed);
 
         [CanBeNull]
         private ClusterConfigClientState GetCurrentState()
