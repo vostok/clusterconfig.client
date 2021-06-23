@@ -28,17 +28,19 @@ namespace Vostok.ClusterConfig.Client.Updaters
         private readonly IClusterClient client;
         private readonly ILog log;
         private readonly string zone;
+        private readonly bool assumeClusterConfigDeployed;
 
-        public RemoteUpdater(bool enabled, IClusterClient client, ILog log, string zone)
+        public RemoteUpdater(bool enabled, IClusterClient client, ILog log, string zone, bool assumeClusterConfigDeployed = false)
         {
             this.enabled = enabled;
             this.client = client;
             this.log = log;
             this.zone = zone;
+            this.assumeClusterConfigDeployed = assumeClusterConfigDeployed;
         }
 
-        public RemoteUpdater(bool enabled, IClusterProvider cluster, ClusterClientSetup setup, ILog log, string zone, TimeSpan timeout)
-            : this(enabled, enabled ? CreateClient(cluster, setup, log, timeout) : null, log, zone)
+        public RemoteUpdater(bool enabled, IClusterProvider cluster, ClusterClientSetup setup, ILog log, string zone, TimeSpan timeout, bool assumeClusterConfigDeployed = false)
+            : this(enabled, enabled ? CreateClient(cluster, setup, log, timeout) : null, log, zone, assumeClusterConfigDeployed)
         {
         }
 
@@ -140,7 +142,9 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 case ClusterResultStatus.ReplicasNotFound:
                     // (iloktionov): If no replicas were resolved during update and we haven't seen any non-trivial settings earlier, 
                     // (iloktionov): we just silently assume CC is not deployed in current environment and return empty settings.
-                    if (lastUpdateResult?.Tree == null)
+
+                    // (tsup): We make assumptions above in case we are not forced to assume that cluster config is deployed.
+                    if (lastUpdateResult?.Tree == null && !assumeClusterConfigDeployed)
                     {
                         if (lastUpdateResult == null)
                             LogAssumingNoServer();

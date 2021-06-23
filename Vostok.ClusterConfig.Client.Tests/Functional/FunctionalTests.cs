@@ -466,7 +466,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             }
         }
 
-        [Test, MaxTime(5000)]
+        [Test, MaxTime(8000)]
         public void Observables_should_protect_internal_updater_from_hanging_observers()
         {
             var subscription = client.ObserveWithVersions(default)
