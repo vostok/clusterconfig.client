@@ -1,3 +1,7 @@
+## 0.1.11 (23.06.2021):
+
+- Added new `AssumeClusterConfigDeployed` setting to remove wrong assumptions in some cases.
+
 ## 0.1.10 (24.02.2021):
 
 Whole file parser for .md files.
