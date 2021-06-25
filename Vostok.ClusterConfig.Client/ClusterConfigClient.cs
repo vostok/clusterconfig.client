@@ -15,6 +15,7 @@ using Vostok.Configuration.Abstractions.SettingsTree;
 using Vostok.Configuration.Sources.Extensions.Observable;
 using Vostok.Logging.Abstractions;
 
+// ReSharper disable InconsistentlySynchronizedField
 // ReSharper disable MethodSupportsCancellation
 
 namespace Vostok.ClusterConfig.Client
@@ -30,8 +31,8 @@ namespace Vostok.ClusterConfig.Client
 
         private readonly object observablePropagationLock;
 
-        private TaskCompletionSource<ClusterConfigClientState> stateSource;
-        private CachingObservable<ClusterConfigClientState> stateObservable;
+        private volatile TaskCompletionSource<ClusterConfigClientState> stateSource;
+        private volatile CachingObservable<ClusterConfigClientState> stateObservable;
 
         /// <summary>
         /// Creates a new instance of <see cref="ClusterConfigClient"/> with given <paramref name="settings"/> merged with default settings from <see cref="DefaultSettingsProvider"/> (non-default user settings take priority).
@@ -295,10 +296,6 @@ namespace Vostok.ClusterConfig.Client
                 Interlocked.Exchange(ref stateSource, newStateSource);
             }
 
-            // (iloktionov): 'stateObservable' might have been already completed by failed initial update iteration. In that case it has to be created from scratch:
-            if (stateObservable.IsCompleted)
-                Interlocked.Exchange(ref stateObservable, new CachingObservable<ClusterConfigClientState>());
-
             // (iloktionov): External observers may take indefinitely long to call, so it's best to offload their callbacks to ThreadPool:
             Task.Run(
                 () =>
@@ -307,6 +304,10 @@ namespace Vostok.ClusterConfig.Client
                     // (iloktionov): Older ones may get lost in the event of a race, but that's acceptable.
                     lock (observablePropagationLock)
                     {
+                        // (iloktionov): 'stateObservable' might have been already completed by failed initial update iteration. In that case it has to be created from scratch:
+                        if (stateObservable.IsCompleted)
+                            stateObservable = new CachingObservable<ClusterConfigClientState>();
+
                         if (ReferenceEquals(state, GetCurrentState()))
                             stateObservable.Next(state);
                     }
@@ -317,7 +318,14 @@ namespace Vostok.ClusterConfig.Client
         {
             var pushedToSource = stateSource.TrySetException(error);
             if (pushedToSource || alwaysPushToObservable)
-                Task.Run(() => stateObservable.Error(error));
+                Task.Run(() =>
+                {
+                    lock (observablePropagationLock)
+                    {
+                        if (GetCurrentState() == null || alwaysPushToObservable)
+                            stateObservable.Error(error);
+                    }
+                });
         }
 
         // ReSharper disable InconsistentNaming
