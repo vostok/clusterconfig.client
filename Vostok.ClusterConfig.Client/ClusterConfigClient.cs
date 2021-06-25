@@ -31,7 +31,7 @@ namespace Vostok.ClusterConfig.Client
 
         private readonly object observablePropagationLock;
 
-        private TaskCompletionSource<ClusterConfigClientState> stateSource;
+        private volatile TaskCompletionSource<ClusterConfigClientState> stateSource;
         private volatile CachingObservable<ClusterConfigClientState> stateObservable;
 
         /// <summary>
