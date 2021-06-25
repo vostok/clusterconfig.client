@@ -1,3 +1,7 @@
+## 0.1.12 (25.06.2021):
+
+Fixed https://github.com/vostok/clusterconfig.client/issues/9
+
 ## 0.1.11 (23.06.2021):
 
 - Added new `AssumeClusterConfigDeployed` setting to remove wrong assumptions in some cases.
