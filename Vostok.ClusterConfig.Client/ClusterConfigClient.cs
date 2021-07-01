@@ -11,6 +11,7 @@ using Vostok.Commons.Collections;
 using Vostok.Commons.Helpers.Observable;
 using Vostok.Commons.Threading;
 using Vostok.Commons.Time;
+using Vostok.Configuration.Abstractions.Merging;
 using Vostok.Configuration.Abstractions.SettingsTree;
 using Vostok.Configuration.Sources.Extensions.Observable;
 using Vostok.Logging.Abstractions;
@@ -123,11 +124,11 @@ namespace Vostok.ClusterConfig.Client
             }
         }
 
-        private static (ISettingsNode settings, long version) GetSettings([NotNull] ClusterConfigClientState state, ClusterConfigPath path)
+        private (ISettingsNode settings, long version) GetSettings([NotNull] ClusterConfigClientState state, ClusterConfigPath path)
         {
             try
             {
-                return (TreeExtractor.Extract(state, path), state.Version);
+                return (TreeExtractor.Extract(state, path, settings.MergeOptions), state.Version);
             }
             catch (Exception error)
             {

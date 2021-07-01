@@ -10,15 +10,17 @@ namespace Vostok.ClusterConfig.Client.Helpers
 {
     internal static class TreeExtractor
     {
-        private static readonly SettingsMergeOptions MergeOptions = new SettingsMergeOptions
+        private static readonly SettingsMergeOptions DefaultMergeOptions = new SettingsMergeOptions
         {
             ObjectMergeStyle = ObjectMergeStyle.Deep,
             ArrayMergeStyle = ArrayMergeStyle.Replace
         };
 
         [CanBeNull]
-        public static ISettingsNode Extract([NotNull] ClusterConfigClientState state, ClusterConfigPath path)
+        public static ISettingsNode Extract([NotNull] ClusterConfigClientState state, ClusterConfigPath path, [CanBeNull] SettingsMergeOptions mergeOptions)
         {
+            mergeOptions = mergeOptions ?? DefaultMergeOptions;
+            
             return state.Cache.Obtain(
                 path,
                 p =>
@@ -32,7 +34,7 @@ namespace Vostok.ClusterConfig.Client.Helpers
                     var remoteSettings = state.RemoteTree?.GetSettings(p);
                     var localSettings = state.LocalTree?.ScopeTo(p.Segments);
 
-                    return SettingsNodeMerger.Merge(remoteSettings, localSettings, MergeOptions);
+                    return SettingsNodeMerger.Merge(remoteSettings, localSettings, mergeOptions);
                 });
         }
 
