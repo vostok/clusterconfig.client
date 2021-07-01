@@ -136,7 +136,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Helpers
                 state = new ClusterConfigClientState(localTree, remote, new RecyclingBoundedCache<ClusterConfigPath, ISettingsNode>(10), Int64.MaxValue);
             }
 
-            return TreeExtractor.Extract(state, path);
+            return TreeExtractor.Extract(state, path, null);
         }
     }
 }
