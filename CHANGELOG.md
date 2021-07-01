@@ -1,3 +1,7 @@
+## 0.1.13 (01.07.2021):
+
+Added `MergeOptions` setting.
+
 ## 0.1.12 (25.06.2021):
 
 Fixed https://github.com/vostok/clusterconfig.client/issues/9
