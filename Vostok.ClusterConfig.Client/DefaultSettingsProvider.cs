@@ -45,7 +45,7 @@ namespace Vostok.ClusterConfig.Client
 
                 var fileParser = new FileParser(new FileParserSettings());
 
-                var fileSettings = fileParser.Parse(file);
+                var fileSettings = fileParser.Parse(file, "local");
                 if (fileSettings == null)
                     return Default;
 

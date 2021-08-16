@@ -26,7 +26,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
             parsedTree = new ObjectNode("tree2");
 
             zoneParser = Substitute.For<IZoneParser>();
-            zoneParser.Parse(Arg.Any<DirectoryInfo>()).Returns(_ => parsedTree);
+            zoneParser.Parse(Arg.Any<DirectoryInfo>(), Arg.Any<string>()).Returns(_ => parsedTree);
 
             folder = new DirectoryInfo(Guid.NewGuid().ToString());
             folder.Create();
