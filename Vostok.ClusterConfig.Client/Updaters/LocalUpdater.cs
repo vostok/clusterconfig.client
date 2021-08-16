@@ -36,7 +36,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             {
                 folder.Refresh();
 
-                return folder.Exists ? zoneParser.Parse(folder) : null;
+                return folder.Exists ? zoneParser.Parse(folder, "local") : null;
             }
             catch (Exception error)
             {
