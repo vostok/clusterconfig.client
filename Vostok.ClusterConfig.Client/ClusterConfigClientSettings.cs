@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using JetBrains.Annotations;
 using Vostok.Clusterclient.Core;
 using Vostok.Clusterclient.Core.Topology;
@@ -13,6 +14,9 @@ namespace Vostok.ClusterConfig.Client
     [PublicAPI]
     public class ClusterConfigClientSettings
     {
+        internal HashSet<string> ChangedSettings = new HashSet<string>();
+        private string zone = ClusterConfigClientDefaults.Zone;
+
         /// <summary>
         /// Gets or sets whether to look for settings files locally in <see cref="LocalFolder"/>.
         /// </summary>
@@ -32,7 +36,15 @@ namespace Vostok.ClusterConfig.Client
         /// <para>Gets or sets the zone queried from server.</para>
         /// <para>Only relevant when <see cref="EnableClusterSettings"/> is set to <c>true</c>.</para>
         /// </summary>
-        public string Zone { get; set; } = ClusterConfigClientDefaults.Zone;
+        public string Zone
+        {
+            get => zone;
+            set
+            {
+                zone = value;
+                ChangedSettings.Add(nameof(Zone));
+            }
+        }
 
         /// <summary>
         /// <para>Gets or sets the path to local folder used to look for files.</para>
