@@ -1,3 +1,7 @@
+## 0.1.14 (28.09.2021):
+
+Fixed #4.
+
 ## 0.1.13 (01.07.2021):
 
 Added `MergeOptions` setting.
