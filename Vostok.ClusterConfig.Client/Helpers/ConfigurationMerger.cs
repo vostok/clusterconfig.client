@@ -20,13 +20,13 @@ namespace Vostok.ClusterConfig.Client.Helpers
                 var userValue = property.GetValue(userSettings);
                 var defaultValue = property.GetValue(DefaultSettings);
 
-                property.SetValue(result, Select(baseValue, userValue, defaultValue));
+                property.SetValue(result, Select(baseValue, userValue, userSettings.ChangedSettings.Contains(property.Name), defaultValue));
             }
 
             return result;
         }
 
-        private static object Select(object baseValue, object userValue, object defaultValue)
-            => !Equals(userValue, defaultValue) ? userValue : baseValue;
+        private static object Select(object baseValue, object userValue, bool userValueChanged, object defaultValue)
+            => userValueChanged || !Equals(userValue, defaultValue) ? userValue : baseValue;
     }
 }
