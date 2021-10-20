@@ -17,7 +17,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Helpers
         public void Should_correctly_merge_two_default_settings_instances()
         {
             ConfigurationMerger.Merge(new ClusterConfigClientSettings(), new ClusterConfigClientSettings())
-                .Should().BeEquivalentTo(new ClusterConfigClientSettings());
+                .Should().BeEquivalentTo(new ClusterConfigClientSettings(), options => options.Excluding(s => s.ChangedSettings));
         }
 
         [Test]
@@ -68,6 +68,23 @@ namespace Vostok.ClusterConfig.Client.Tests.Helpers
                 typeof(ClusterConfigClientSettings).GetProperty(propertyName).GetValue(mergedSettings).Should().Be(anotherNonDefaultValue);
             }
         }
+        
+        [Test]
+        public void Should_prefer_default_user_settings()
+        {
+            foreach (var (propertyName, nonDefaultValue, defaultValue) in EnumerateDefaultValues())
+            {
+                var baseSettings = new ClusterConfigClientSettings();
+                var userSettings = new ClusterConfigClientSettings();
+
+                typeof(ClusterConfigClientSettings).GetProperty(propertyName).SetValue(baseSettings, nonDefaultValue);
+                typeof(ClusterConfigClientSettings).GetProperty(propertyName).SetValue(userSettings, defaultValue);
+
+                var mergedSettings = ConfigurationMerger.Merge(baseSettings, userSettings);
+
+                typeof(ClusterConfigClientSettings).GetProperty(propertyName).GetValue(mergedSettings).Should().Be(defaultValue);
+            }
+        }
 
         private IEnumerable<(string, object, object)> EnumerateNonDefaultValues()
         {
@@ -82,6 +99,11 @@ namespace Vostok.ClusterConfig.Client.Tests.Helpers
             yield return (nameof(ClusterConfigClientSettings.MaximumFileSize), 435345, 14345);
             yield return (nameof(ClusterConfigClientSettings.RequestTimeout), 50.Seconds(), 51.Seconds());
             yield return (nameof(ClusterConfigClientSettings.UpdatePeriod), 1.Hours(), 2.Hours());
+        }
+        
+        private IEnumerable<(string, object, object)> EnumerateDefaultValues()
+        {
+            yield return (nameof(ClusterConfigClientSettings.Zone), "my-zone", ClusterConfigClientDefaults.Zone);
         }
     }
 }
