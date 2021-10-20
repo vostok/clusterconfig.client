@@ -279,10 +279,10 @@ namespace Vostok.ClusterConfig.Client
             var newCaches = new RecyclingBoundedCache<ClusterConfigPath, ISettingsNode>(settings.CacheCapacity);
             var newVersion = (oldState?.Version ?? 0L) + 1;
             
-            if (!settings.EnableLocalSettings)
-                newVersion = remoteUpdateResult.Changed 
-                    ? remoteUpdateResult.Version.Ticks 
-                    : oldState?.Version ?? 0L;
+            if (!settings.EnableLocalSettings && settings.EnableClusterSettings)
+                newVersion = remoteUpdateResult.Changed && remoteUpdateResult.Version != DateTime.MinValue
+                    ? remoteUpdateResult.Version.Ticks
+                    : newVersion;
 
             return new ClusterConfigClientState(newLocalTree, newRemoteTree, newCaches, newVersion);
         }
