@@ -144,8 +144,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 
             server.SetResponse(remoteTree1, version1);
 
-            VerifyResults(default, 1, remoteTree1);
-            VerifyResults("foo", 1, remoteTree1["foo"]);
+            VerifyResults(default, version1.Ticks, remoteTree1);
+            VerifyResults("foo", version1.Ticks, remoteTree1["foo"]);
         }
 
         [Test]
@@ -155,13 +155,13 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 
             server.SetResponse(remoteTree1, version1);
 
-            VerifyResults(default, 1, remoteTree1);
-            VerifyResults("foo", 1, remoteTree1["foo"]);
+            VerifyResults(default, version1.Ticks, remoteTree1);
+            VerifyResults("foo", version1.Ticks, remoteTree1["foo"]);
 
             server.SetResponse(remoteTree2, version2);
 
-            VerifyResults(default, 2, remoteTree2);
-            VerifyResults("foo", 2, remoteTree2["foo"]);
+            VerifyResults(default, version2.Ticks, remoteTree2);
+            VerifyResults("foo", version2.Ticks, remoteTree2["foo"]);
         }
 
         [Test]
@@ -522,7 +522,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             client = new ClusterConfigClient(settings);
         }
 
-        private void VerifyResults(ClusterConfigPath path, int expectedVersion, ISettingsNode expectedTree, bool includeObservables = true)
+        private void VerifyResults(ClusterConfigPath path, long expectedVersion, ISettingsNode expectedTree, bool includeObservables = true)
         {
             Action assertion = () =>
             {
