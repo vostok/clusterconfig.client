@@ -1,3 +1,7 @@
+## 0.1.15 (20.10.2021):
+
+- Use remote version when local settings are disabled.
+
 ## 0.1.14 (28.09.2021):
 
 Fixed #4.
