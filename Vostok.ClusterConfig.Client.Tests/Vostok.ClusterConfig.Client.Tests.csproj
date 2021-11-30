@@ -26,27 +26,27 @@
   <ItemGroup>
     <Reference Include="Vostok.ClusterConfig.Client.Abstractions">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\vostok.clusterconfig.client.abstractions\Vostok.ClusterConfig.Client.Abstractions\bin\Release\netstandard2.0\Vostok.ClusterConfig.Client.Abstractions.dll</HintPath>
+      <HintPath>..\..\vostok.clusterconfig.client.abstractions\Vostok.ClusterConfig.Client.Abstractions\bin\Release\$(ReferencesFramework)\Vostok.ClusterConfig.Client.Abstractions.dll</HintPath>
     </Reference>
 
     <Reference Include="Vostok.Configuration.Abstractions">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\vostok.configuration.abstractions\Vostok.Configuration.Abstractions\bin\Release\netstandard2.0\Vostok.Configuration.Abstractions.dll</HintPath>
+      <HintPath>..\..\vostok.configuration.abstractions\Vostok.Configuration.Abstractions\bin\Release\$(ReferencesFramework)\Vostok.Configuration.Abstractions.dll</HintPath>
     </Reference>
 
     <Reference Include="Vostok.Logging.Console">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\vostok.logging.console\Vostok.Logging.Console\bin\Release\netstandard2.0\Vostok.Logging.Console.dll</HintPath>
+      <HintPath>..\..\vostok.logging.console\Vostok.Logging.Console\bin\Release\$(ReferencesFramework)\Vostok.Logging.Console.dll</HintPath>
     </Reference>
 
     <Reference Include="Vostok.Logging.Abstractions">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\vostok.logging.abstractions\Vostok.Logging.Abstractions\bin\Release\netstandard2.0\Vostok.Logging.Abstractions.dll</HintPath>
+      <HintPath>..\..\vostok.logging.abstractions\Vostok.Logging.Abstractions\bin\Release\$(ReferencesFramework)\Vostok.Logging.Abstractions.dll</HintPath>
     </Reference>
     
     <Reference Include="Vostok.ClusterClient.Core">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\vostok.clusterclient.core\Vostok.ClusterClient.Core\bin\Release\netstandard2.0\Vostok.ClusterClient.Core.dll</HintPath>
+      <HintPath>..\..\vostok.clusterclient.core\Vostok.ClusterClient.Core\bin\Release\$(ReferencesFramework)\Vostok.ClusterClient.Core.dll</HintPath>
     </Reference>
   </ItemGroup>
 
