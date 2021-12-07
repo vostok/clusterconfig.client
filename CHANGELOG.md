@@ -1,3 +1,7 @@
+## 0.1.16 (06-12-2021):
+
+Added `net6.0` target.
+
 ## 0.1.15 (20.10.2021):
 
 - Use remote version when local settings are disabled.
