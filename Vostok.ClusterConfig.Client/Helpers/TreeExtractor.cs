@@ -1,8 +1,7 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using System;
+using System.Collections.Generic;
 using System.Text;
 using JetBrains.Annotations;
-using Vostok.ClusterConfig.Client.Abstractions;
 using Vostok.Configuration.Abstractions.Merging;
 using Vostok.Configuration.Abstractions.SettingsTree;
 
@@ -16,26 +15,31 @@ namespace Vostok.ClusterConfig.Client.Helpers
             ArrayMergeStyle = ArrayMergeStyle.Replace
         };
 
+        private static readonly Func<ClusterConfigPath, (ClusterConfigClientState state, SettingsMergeOptions mergeOptions), ISettingsNode> Factory = SettingsNode;
+
         [CanBeNull]
         public static ISettingsNode Extract([NotNull] ClusterConfigClientState state, ClusterConfigPath path, [CanBeNull] SettingsMergeOptions mergeOptions)
         {
-            mergeOptions = mergeOptions ?? DefaultMergeOptions;
-            
+            mergeOptions ??= DefaultMergeOptions;
+
             return state.Cache.Obtain(
                 path,
-                p =>
-                {
-                    foreach (var prefix in EnumeratePrefixes(p))
-                    {
-                        if (state.Cache.TryGetValue(prefix, out var tree))
-                            return tree.ScopeTo(path.Segments.Skip(prefix.Segments.Count()));
-                    }
+                (state, mergeOptions),
+                Factory);
+        }
 
-                    var remoteSettings = state.RemoteTree?.GetSettings(p);
-                    var localSettings = state.LocalTree?.ScopeTo(p.Segments);
+        private static ISettingsNode SettingsNode(ClusterConfigPath path, (ClusterConfigClientState state, SettingsMergeOptions mergeOptions) args)
+        {
+            foreach (var prefix in EnumeratePrefixes(path))
+            {
+                if (args.state.Cache.TryGetValue(prefix, out var tree))
+                    return tree.ScopeTo(path.Segments.Skip(prefix.Segments.Count()));
+            }
 
-                    return SettingsNodeMerger.Merge(remoteSettings, localSettings, mergeOptions);
-                });
+            var remoteSettings = args.state.RemoteTree?.GetSettings(path);
+            var localSettings = args.state.LocalTree?.ScopeTo(path.Segments);
+
+            return SettingsNodeMerger.Merge(remoteSettings, localSettings, args.mergeOptions);
         }
 
         private static IEnumerable<ClusterConfigPath> EnumeratePrefixes(ClusterConfigPath path)
