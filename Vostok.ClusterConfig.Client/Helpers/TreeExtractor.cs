@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using JetBrains.Annotations;
 using Vostok.ClusterConfig.Client.Abstractions;
@@ -16,7 +17,7 @@ namespace Vostok.ClusterConfig.Client.Helpers
             ArrayMergeStyle = ArrayMergeStyle.Replace
         };
 
-        private static readonly Func<ClusterConfigPath, (ClusterConfigClientState state, SettingsMergeOptions mergeOptions), ISettingsNode> Factory = SettingsNode;
+        private static readonly Func<ClusterConfigPath, (ClusterConfigClientState state, SettingsMergeOptions mergeOptions), ISettingsNode> Factory = SettingsNodeFactory;
 
         [CanBeNull]
         public static ISettingsNode Extract([NotNull] ClusterConfigClientState state, ClusterConfigPath path, [CanBeNull] SettingsMergeOptions mergeOptions)
@@ -29,18 +30,19 @@ namespace Vostok.ClusterConfig.Client.Helpers
                 Factory);
         }
 
-        private static ISettingsNode SettingsNode(ClusterConfigPath path, (ClusterConfigClientState state, SettingsMergeOptions mergeOptions) args)
+        private static ISettingsNode SettingsNodeFactory(ClusterConfigPath path, (ClusterConfigClientState state, SettingsMergeOptions mergeOptions) args)
         {
+            var (state, mergeOptions) = args;
             foreach (var prefix in EnumeratePrefixes(path))
             {
-                if (args.state.Cache.TryGetValue(prefix, out var tree))
+                if (state.Cache.TryGetValue(prefix, out var tree))
                     return tree.ScopeTo(path.Segments.Skip(prefix.Segments.Count()));
             }
 
-            var remoteSettings = args.state.RemoteTree?.GetSettings(path);
-            var localSettings = args.state.LocalTree?.ScopeTo(path.Segments);
+            var remoteSettings = state.RemoteTree?.GetSettings(path);
+            var localSettings = state.LocalTree?.ScopeTo(path.Segments);
 
-            return SettingsNodeMerger.Merge(remoteSettings, localSettings, args.mergeOptions);
+            return SettingsNodeMerger.Merge(remoteSettings, localSettings, mergeOptions);
         }
 
         private static IEnumerable<ClusterConfigPath> EnumeratePrefixes(ClusterConfigPath path)
