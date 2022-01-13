@@ -1,3 +1,7 @@
+## 0.1.18 (13-01-2022):
+
+Reduced memory traffic and added several optimizations to the hot pathes.
+
 ## 0.1.17 (06-12-2021):
 
 Added `net6.0` target.
