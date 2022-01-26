@@ -1,8 +1,9 @@
-namespace Vostok.ClusterConfig.Client.Abstractions;
-
-public enum ProtocolVersion
+namespace Vostok.ClusterConfig.Client.Abstractions
 {
-    // V0 = 0, // reserved for legacy protocol
-    V1 = 1,
-    V2 = 2
+    public enum ProtocolVersion
+    {
+        // V0 = 0, // reserved for legacy protocol
+        V1 = 1,
+        V2 = 2
+    }
 }

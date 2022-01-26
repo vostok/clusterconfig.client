@@ -16,7 +16,6 @@ using Vostok.Clusterclient.Transport;
 using Vostok.ClusterConfig.Client.Abstractions;
 using Vostok.ClusterConfig.Client.Exceptions;
 using Vostok.ClusterConfig.Client.Helpers;
-using Vostok.ClusterConfig.Core.Serialization;
 using Vostok.Logging.Abstractions;
 
 namespace Vostok.ClusterConfig.Client.Updaters
@@ -63,8 +62,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             return requestResult.Response.Code switch
             {
                 ResponseCode.NotModified => HandleNotModifiedResponse(lastResult, requestResult.Response),
-                ResponseCode.Ok => HandleSuccessResponse(protocol, lastResult, requestResult.Response, (response, version, recommended) => CreateResultViaFullZone(protocol, response, version, requestResult.Replica, recommended)),
-                ResponseCode.PartialContent => HandleSuccessResponse(protocol, lastResult, requestResult.Response, (response, version, recommended) => CreateResultViaPatch(protocol, response, version, requestResult.Replica, lastResult, recommended)),
+                ResponseCode.Ok or ResponseCode.PartialContent => HandleSuccessResponse(protocol, lastResult, requestResult.Response, requestResult.Replica),
                 _ => throw NoAcceptableResponseException(requestResult)
             };
         }
@@ -120,7 +118,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
         private Request CreateRequest(ProtocolVersion protocol, DateTime? lastVersion)
         {
-            var request = Request.Get(GetProtocolUrl(protocol))
+            var request = Request.Get(protocol.GetUrlPath())
                 .WithAdditionalQueryParameter("zoneName", zone)
                 .WithAcceptHeader("application/octet-stream")
                 .WithAcceptEncodingHeader("gzip");
@@ -130,13 +128,6 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
             return request;
         }
-
-        private static string GetProtocolUrl(ProtocolVersion protocol) => protocol switch
-        {
-            ProtocolVersion.V1 => "_v1/zone",
-            ProtocolVersion.V2 => "_v2/zone",
-            var x => throw new InvalidOperationException($"Unknown protocol version '{x}'")
-        };
 
         [CanBeNull]
         private RemoteUpdateResult TryHandleFailure(ClusterResult requestResult, RemoteUpdateResult lastUpdateResult)
@@ -186,31 +177,37 @@ namespace Vostok.ClusterConfig.Client.Updaters
         }
 
         [NotNull]
-        private RemoteUpdateResult HandleSuccessResponse(ProtocolVersion protocol, RemoteUpdateResult lastUpdateResult, Response response, Func<Response, DateTime, ProtocolVersion?, RemoteUpdateResult> createResult)
+        private RemoteUpdateResult HandleSuccessResponse(ProtocolVersion protocol, RemoteUpdateResult lastUpdateResult, Response response, Uri replica)
         {
             if (!response.HasContent)
-                throw Empty200ResponseException();
+                throw new RemoteUpdateException($"Received an empty {response.Code} response from server. Nothing to deserialize.");
 
             if (response.Headers.LastModified == null)
-                throw MissingLastModifiedHeaderException();
+                throw new RemoteUpdateException($"Received a {response.Code} response without 'LastModified' header.");
 
             var recommendedProtocol = GetRecommendedProtocolVersion(response);
             
             var version = DateTime.Parse(response.Headers.LastModified, null, DateTimeStyles.AssumeUniversal).ToUniversalTime();
 
-            if (lastUpdateResult == null || version > lastUpdateResult.Version)
-                return createResult(response, version, recommendedProtocol);
-            
-            if (version < lastUpdateResult.Version)
-                LogStaleVersion(version, lastUpdateResult.Version, protocol);
+            if (lastUpdateResult != null && version <= lastUpdateResult.Version)
+            {
+                if (version < lastUpdateResult.Version)
+                    LogStaleVersion(version, lastUpdateResult.Version, protocol);
 
-            return new RemoteUpdateResult(false, lastUpdateResult.Tree, lastUpdateResult.Version, recommendedProtocol);
+                return new RemoteUpdateResult(false, lastUpdateResult.Tree, lastUpdateResult.Version, recommendedProtocol);
+            }
 
+            return response.Code switch
+            {
+                ResponseCode.Ok => CreateResultViaFullZone(protocol, response, version, replica, recommendedProtocol),
+                ResponseCode.PartialContent => CreateResultViaPatch(protocol, response, version, replica, lastUpdateResult, recommendedProtocol),
+                var code => throw new RemoteUpdateException($"Failed to update settings from server: unknown successful response code {code}")
+            };
         }
 
         private RemoteUpdateResult CreateResultViaFullZone(ProtocolVersion protocol, Response response, DateTime version, Uri replica, ProtocolVersion? recommendedProtocol)
         {
-            var tree = new RemoteTree(response.Content.ToArray(), GetSerializer(protocol));
+            var tree = new RemoteTree(response.Content.ToArray(), protocol.GetSerializer());
 
             LogReceivedNewZone(tree, version, replica, false, protocol);
 
@@ -226,19 +223,12 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 UnexpectedPatchException();
             
             var patch = response.Content.ToArray();
-            var tree = new RemoteTree(lastResult!.Tree!.Serialized.ApplyV2Patch(patch), GetSerializer(protocol));
+            var tree = new RemoteTree(lastResult!.Tree!.Serialized.ApplyV2Patch(patch), protocol.GetSerializer());
 
             LogReceivedNewZone(tree, version, replica, true, protocol);
 
             return new RemoteUpdateResult(true, tree, version, recommendedProtocol);
         }
-
-        private ITreeSerializer GetSerializer(ProtocolVersion protocol) => protocol switch
-        {
-            ProtocolVersion.V1 => TreeSerializers.V1,
-            ProtocolVersion.V2 => TreeSerializers.V2,
-            var x => throw new InvalidOperationException($"Unknown protocol version '{x}'")
-        };
 
         private ProtocolVersion? GetRecommendedProtocolVersion(Response response) =>
             response.Headers[ClusterConfigHeaderNames.RecommendedProtocol] is {} header
@@ -268,17 +258,11 @@ namespace Vostok.ClusterConfig.Client.Updaters
         private static Exception UnexpectedNotModifiedResponseException()
             => new RemoteUpdateException("Received unexpected 'NotModified' response from server although no current version was sent in request.");
 
-        private static Exception Empty200ResponseException()
-            => new RemoteUpdateException("Received an empty 200 response from server. Nothing to deserialize.");
-        
         private static Exception NothingToPatchException()
             => new RemoteUpdateException("Received 206 response from server, but nothing to patch.");
         
         private static Exception UnexpectedPatchException()
             => new RemoteUpdateException("Received 206 response from server, but it's not supported for current protocol.");
-
-        private static Exception MissingLastModifiedHeaderException() 
-            => new RemoteUpdateException("Received a 200 response without 'LastModified' header.");
 
         private static Exception NoAcceptableResponseException(ClusterResult result)
             => new RemoteUpdateException($"Failed to update settings from server. Request status = '{result.Status}'. Replica responses = '{string.Join(", ", result.ReplicaResults.Select(r => r.Response.Code))}'.");
