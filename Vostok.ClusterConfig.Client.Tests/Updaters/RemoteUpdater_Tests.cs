@@ -8,6 +8,7 @@ using NSubstitute;
 using NUnit.Framework;
 using Vostok.Clusterclient.Core;
 using Vostok.Clusterclient.Core.Model;
+using Vostok.ClusterConfig.Client.Abstractions;
 using Vostok.ClusterConfig.Client.Exceptions;
 using Vostok.ClusterConfig.Client.Helpers;
 using Vostok.ClusterConfig.Client.Updaters;
@@ -19,9 +20,10 @@ using Vostok.Logging.Console;
 
 namespace Vostok.ClusterConfig.Client.Tests.Updaters
 {
-    [TestFixture]
+    [TestFixture(ProtocolVersion.V1)]
     internal class RemoteUpdater_Tests
     {
+        private readonly ProtocolVersion protocol;
         private IClusterClient client;
         private ILog log;
 
@@ -35,6 +37,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
 
         private DateTime version1;
         private DateTime version2;
+
+        public RemoteUpdater_Tests(ProtocolVersion protocol) => this.protocol = protocol;
 
         [SetUp]
         public void TestSetup()
@@ -120,7 +124,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(ClusterResultStatus.ReplicasNotFound);
 
-            Action action = () => Update(new RemoteUpdateResult(false, tree1, version1));
+            Action action = () => Update(new RemoteUpdateResult(false, tree1, version1, null));
 
             Console.Out.WriteLine(action.Should().Throw<RemoteUpdateException>().Which);
         }
@@ -133,7 +137,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(status);
 
-            Action action = () => Update(new RemoteUpdateResult(false, tree1, version1));
+            Action action = () => Update(new RemoteUpdateResult(false, tree1, version1, null));
 
             Console.Out.WriteLine(action.Should().Throw<RemoteUpdateException>().Which);
         }
@@ -149,7 +153,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
                 ResponseCode.ReceiveFailure,
                 ResponseCode.ServiceUnavailable);
 
-            Action action = () => Update(new RemoteUpdateResult(false, tree1, version1));
+            Action action = () => Update(new RemoteUpdateResult(false, tree1, version1, null));
 
             Console.Out.WriteLine(action.Should().Throw<RemoteUpdateException>().Which);
         }
@@ -189,7 +193,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(ResponseCode.NotModified);
 
-            var result = Update(new RemoteUpdateResult(true, tree1, version1));
+            var result = Update(new RemoteUpdateResult(true, tree1, version1, null));
 
             result.Changed.Should().BeFalse();
             result.Tree.Should().BeSameAs(tree1);
@@ -221,7 +225,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(tree1.Serialized, version1);
 
-            var result = Update(new RemoteUpdateResult(false, tree2, version2));
+            var result = Update(new RemoteUpdateResult(false, tree2, version2, null));
 
             result.Changed.Should().BeFalse();
             result.Tree.Should().BeSameAs(tree2);
@@ -245,7 +249,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(tree2.Serialized, version2);
 
-            var result = Update(new RemoteUpdateResult(false, tree1, version1));
+            var result = Update(new RemoteUpdateResult(false, tree1, version1, null));
 
             result.Changed.Should().BeTrue();
             result.Tree?.Serialized.Should().Equal(tree2.Serialized);
@@ -257,7 +261,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(tree2.Serialized, version2);
 
-            var result = Update(new RemoteUpdateResult(false, tree2, version2));
+            var result = Update(new RemoteUpdateResult(false, tree2, version2, null));
 
             result.Changed.Should().BeFalse();
             result.Tree?.Serialized.Should().Equal(tree2.Serialized);
@@ -265,10 +269,10 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         }
 
         private RemoteUpdateResult Update(RemoteUpdateResult previous)
-            => enabledUpdater.UpdateAsync(previous, cancellation.Token).GetAwaiter().GetResult();
+            => enabledUpdater.UpdateAsync(protocol, previous, cancellation.Token).GetAwaiter().GetResult();
 
         private RemoteUpdateResult UpdateDisabled(RemoteUpdateResult previous)
-            => disabledUpdater.UpdateAsync(previous, cancellation.Token).GetAwaiter().GetResult();
+            => disabledUpdater.UpdateAsync(protocol, previous, cancellation.Token).GetAwaiter().GetResult();
 
         private void SetupResponse(ClusterResultStatus status, params ResponseCode[] responses)
         {
