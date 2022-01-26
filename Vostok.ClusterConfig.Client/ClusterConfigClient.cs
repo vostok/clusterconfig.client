@@ -25,6 +25,8 @@ namespace Vostok.ClusterConfig.Client
     [PublicAPI]
     public class ClusterConfigClient : IClusterConfigClient, IDisposable
     {
+        private static readonly ProtocolVersion DefaultProtocol = ProtocolVersion.V1;
+        
         private readonly ClusterConfigClientSettings settings;
         private readonly CancellationTokenSource cancellationSource;
         private readonly AtomicInt clientState;
@@ -182,10 +184,13 @@ namespace Vostok.ClusterConfig.Client
             var lastLocalResult = null as LocalUpdateResult;
             var lastRemoteResult = null as RemoteUpdateResult;
 
+            var protocol = settings.ForcedProtocolVersion ?? DefaultProtocol;
+
             log.Info(
-                "Starting updates for zone '{Zone}' with period {Period}.",
+                "Starting updates for zone '{Zone}' with period {Period} and protocol {Protocol}.",
                 settings.Zone,
-                settings.UpdatePeriod);
+                settings.UpdatePeriod,
+                protocol);
 
             log.Info(
                 "Local settings enabled = {EnableLocalSettings}. Local folder = '{LocalFolder}'.",
@@ -206,12 +211,19 @@ namespace Vostok.ClusterConfig.Client
                 try
                 {
                     var localUpdateResult = localUpdater.Update(lastLocalResult);
-                    var remoteUpdateResult = await remoteUpdater.UpdateAsync(lastRemoteResult, cancellationToken).ConfigureAwait(false);
+                    var remoteUpdateResult = await remoteUpdater.UpdateAsync(protocol, lastRemoteResult, cancellationToken).ConfigureAwait(false);
+
+                    if (remoteUpdateResult.RecommendedProtocol is {} recommendedProtocol && settings.ForcedProtocolVersion == null)
+                    {
+                        if (protocol != recommendedProtocol)
+                        {
+                            log.Info("Protocol has been changed via server recommendation: {OldProtocol} -> {NewProtocol}", protocol, recommendedProtocol);
+                            protocol = recommendedProtocol;
+                        }
+                    }
 
                     if (currentState == null || localUpdateResult.Changed || remoteUpdateResult.Changed)
-                    {
                         PropagateNewState(CreateNewState(currentState, localUpdateResult, remoteUpdateResult), cancellationToken);
-                    }
 
                     lastLocalResult = localUpdateResult;
                     lastRemoteResult = remoteUpdateResult;
