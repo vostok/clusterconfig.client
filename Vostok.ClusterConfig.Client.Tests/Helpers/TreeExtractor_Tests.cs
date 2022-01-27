@@ -4,19 +4,22 @@ using FluentAssertions;
 using NUnit.Framework;
 using Vostok.ClusterConfig.Client.Abstractions;
 using Vostok.ClusterConfig.Client.Helpers;
-using Vostok.ClusterConfig.Core.Serialization;
 using Vostok.Commons.Binary;
 using Vostok.Commons.Collections;
 using Vostok.Configuration.Abstractions.SettingsTree;
 
 namespace Vostok.ClusterConfig.Client.Tests.Helpers
 {
-    [TestFixture]
+    [TestFixture(ProtocolVersion.V1)]
+    [TestFixture(ProtocolVersion.V2)]
     internal class TreeExtractor_Tests
     {
+        private readonly ProtocolVersion protocol;
         private ISettingsNode localTree;
         private ISettingsNode remoteTree;
         private ClusterConfigClientState state;
+
+        public TreeExtractor_Tests(ProtocolVersion protocol) => this.protocol = protocol;
 
         [SetUp]
         public void TestSetup()
@@ -128,9 +131,9 @@ namespace Vostok.ClusterConfig.Client.Tests.Helpers
                 {
                     var writer = new BinaryBufferWriter(64);
 
-                    TreeSerializers.V1.Serialize(remoteTree, writer);
+                    protocol.GetSerializer().Serialize(remoteTree, writer);
 
-                    remote = new RemoteTree(writer.Buffer.Take(writer.Length).ToArray(), TreeSerializers.V1);
+                    remote = new RemoteTree(protocol, writer.Buffer.Take(writer.Length).ToArray(), protocol.GetSerializer());
                 }
 
                 state = new ClusterConfigClientState(localTree, remote, new RecyclingBoundedCache<ClusterConfigPath, ISettingsNode>(10), Int64.MaxValue);

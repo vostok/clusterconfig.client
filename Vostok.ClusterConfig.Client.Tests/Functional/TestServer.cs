@@ -4,7 +4,8 @@ using System.IO.Compression;
 using System.Net;
 using System.Threading.Tasks;
 using Vostok.Clusterclient.Core.Model;
-using Vostok.ClusterConfig.Core.Serialization;
+using Vostok.ClusterConfig.Client.Abstractions;
+using Vostok.ClusterConfig.Client.Helpers;
 using Vostok.Commons.Binary;
 using Vostok.Commons.Helpers.Network;
 using Vostok.Configuration.Abstractions.SettingsTree;
@@ -13,11 +14,13 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 {
     internal class TestServer : IDisposable
     {
+        private readonly ProtocolVersion protocol;
         private readonly HttpListener listener;
         private volatile Response response;
 
-        public TestServer()
+        public TestServer(ProtocolVersion protocol)
         {
+            this.protocol = protocol;
             Port = FreeTcpPortFinder.GetFreePort();
 
             listener = new HttpListener();
@@ -88,11 +91,11 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             context.Response.Close();
         }
 
-        private static byte[] SerializeTree(ISettingsNode tree)
+        private byte[] SerializeTree(ISettingsNode tree)
         {
             var writer = new BinaryBufferWriter(64);
 
-            TreeSerializers.V1.Serialize(tree, writer);
+            protocol.GetSerializer().Serialize(tree, writer);
 
             var buffer = new MemoryStream();
 

@@ -49,7 +49,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             if (!enabled)
                 return CreateEmptyResult(lastResult);
 
-            var request = CreateRequest(protocol, lastResult?.Version);
+            var request = CreateRequest(protocol, lastResult?.Version, lastResult?.Tree?.Protocol);
             var requestPriority = lastResult == null ? RequestPriority.Critical : RequestPriority.Ordinary;
             var requestResult = await client.SendAsync(request, priority: requestPriority, cancellationToken: cancellationToken).ConfigureAwait(false);
 
@@ -116,7 +116,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
         private static RemoteUpdateResult CreateEmptyResult([CanBeNull] RemoteUpdateResult lastResult)
             => new(lastResult?.Version != EmptyResultVersion, null, EmptyResultVersion, lastResult?.RecommendedProtocol);
 
-        private Request CreateRequest(ProtocolVersion protocol, DateTime? lastVersion)
+        private Request CreateRequest(ProtocolVersion protocol, DateTime? lastVersion, ProtocolVersion? lastProtocol)
         {
             var request = Request.Get(protocol.GetUrlPath())
                 .WithAdditionalQueryParameter("zoneName", zone)
@@ -125,6 +125,11 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
             if (lastVersion.HasValue)
                 request = request.WithIfModifiedSinceHeader(lastVersion.Value);
+
+            if (lastProtocol == null)
+                request = request.WithAdditionalQueryParameter(ClusterConfigQueryParameters.ForceFullQueryKey, ClusterConfigQueryParameters.ForceFullReasonNoPrevious);
+            else if (protocol != lastProtocol)
+                request = request.WithAdditionalQueryParameter(ClusterConfigQueryParameters.ForceFullQueryKey, ClusterConfigQueryParameters.ForceFullReasonProtocolChanged);
 
             return request;
         }
@@ -207,7 +212,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
         private RemoteUpdateResult CreateResultViaFullZone(ProtocolVersion protocol, Response response, DateTime version, Uri replica, ProtocolVersion? recommendedProtocol)
         {
-            var tree = new RemoteTree(response.Content.ToArray(), protocol.GetSerializer());
+            var tree = new RemoteTree(protocol, response.Content.ToArray(), protocol.GetSerializer());
 
             LogReceivedNewZone(tree, version, replica, false, protocol);
 
@@ -216,14 +221,17 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
         private RemoteUpdateResult CreateResultViaPatch(ProtocolVersion protocol, Response response, DateTime version, Uri replica, RemoteUpdateResult lastResult, ProtocolVersion? recommendedProtocol)
         {
-            if (lastResult?.Tree?.Serialized == null)
-                NothingToPatchException();
-            
             if (protocol != ProtocolVersion.V2)
-                UnexpectedPatchException();
+                throw new RemoteUpdateException("Received 206 response from server, but it's not supported for current protocol.");
+            
+            if (lastResult?.Tree?.Serialized == null)
+                throw new RemoteUpdateException("Received 206 response from server, but nothing to patch.");
+
+            if (protocol != lastResult.Tree.Protocol)
+                throw new RemoteUpdateException($"Received 206 response from server, but can't apply {protocol} patch to {lastResult.Tree.Protocol} tree.");
             
             var patch = response.Content.ToArray();
-            var tree = new RemoteTree(lastResult!.Tree!.Serialized.ApplyV2Patch(patch), protocol.GetSerializer());
+            var tree = new RemoteTree(protocol, lastResult.Tree.Serialized.ApplyV2Patch(patch), protocol.GetSerializer());
 
             LogReceivedNewZone(tree, version, replica, true, protocol);
 
@@ -257,12 +265,6 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
         private static Exception UnexpectedNotModifiedResponseException()
             => new RemoteUpdateException("Received unexpected 'NotModified' response from server although no current version was sent in request.");
-
-        private static Exception NothingToPatchException()
-            => new RemoteUpdateException("Received 206 response from server, but nothing to patch.");
-        
-        private static Exception UnexpectedPatchException()
-            => new RemoteUpdateException("Received 206 response from server, but it's not supported for current protocol.");
 
         private static Exception NoAcceptableResponseException(ClusterResult result)
             => new RemoteUpdateException($"Failed to update settings from server. Request status = '{result.Status}'. Replica responses = '{string.Join(", ", result.ReplicaResults.Select(r => r.Response.Code))}'.");

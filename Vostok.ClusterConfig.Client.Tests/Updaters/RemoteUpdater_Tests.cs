@@ -21,6 +21,7 @@ using Vostok.Logging.Console;
 namespace Vostok.ClusterConfig.Client.Tests.Updaters
 {
     [TestFixture(ProtocolVersion.V1)]
+    [TestFixture(ProtocolVersion.V2)]
     internal class RemoteUpdater_Tests
     {
         private readonly ProtocolVersion protocol;
@@ -52,8 +53,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
 
             cancellation = new CancellationTokenSource();
 
-            tree1 = new RemoteTree(Guid.NewGuid().ToByteArray(), TreeSerializers.V1);
-            tree2 = new RemoteTree(Guid.NewGuid().ToByteArray(), TreeSerializers.V1);
+            tree1 = new RemoteTree(protocol, Guid.NewGuid().ToByteArray(), protocol.GetSerializer());
+            tree2 = new RemoteTree(protocol, Guid.NewGuid().ToByteArray(), protocol.GetSerializer());
 
             version1 = DateTime.UtcNow;
             version1 = new DateTime(version1.Year, version1.Month, version1.Day, version1.Hour, version1.Minute, version1.Second, 0, version1.Kind);
