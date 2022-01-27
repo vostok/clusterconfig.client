@@ -18,9 +18,11 @@ using Vostok.Logging.Console;
 
 namespace Vostok.ClusterConfig.Client.Tests.Functional
 {
-    [TestFixture]
+    [TestFixture(ProtocolVersion.V1)]
+    [TestFixture(ProtocolVersion.V2)]
     internal class FunctionalTests
     {
+        private readonly ProtocolVersion protocol;
         private TestServer server;
         private TestFolder folder;
         private TestObserver<(ISettingsNode, long)> observer;
@@ -36,12 +38,14 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         private DateTime version1;
         private DateTime version2;
 
+        public FunctionalTests(ProtocolVersion protocol) => this.protocol = protocol;
+
         [SetUp]
         public void TestSetup()
         {
             folder = new TestFolder();
 
-            server = new TestServer();
+            server = new TestServer(protocol);
             server.Start();
 
             observer = new TestObserver<(ISettingsNode, long)>();
@@ -53,7 +57,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
                 LocalFolder = folder.Directory.FullName,
                 Cluster = new FixedClusterProvider(new Uri(server.Url)),
                 UpdatePeriod = 250.Milliseconds(),
-                Log = new SynchronousConsoleLog()
+                Log = new SynchronousConsoleLog(),
+                ForcedProtocolVersion = protocol
             };
 
             client = new ClusterConfigClient(settings);
