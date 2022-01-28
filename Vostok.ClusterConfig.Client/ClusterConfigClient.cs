@@ -217,7 +217,7 @@ namespace Vostok.ClusterConfig.Client
                     {
                         if (protocol != recommendedProtocol)
                         {
-                            log.Info("Protocol has been changed via server recommendation: {OldProtocol} -> {NewProtocol}", protocol, recommendedProtocol);
+                            log.Info("Protocol changed via server recommendation: {OldProtocol} -> {NewProtocol}", protocol, recommendedProtocol);
                             protocol = recommendedProtocol;
                         }
                     }
