@@ -51,6 +51,8 @@
     <Compile Include="..\..\vostok.commons.threading\Vostok.Commons.Threading\AtomicInt.cs" Link="Commons\AtomicInt.cs" />
     <Compile Include="..\..\vostok.commons.time\Vostok.Commons.Time\TimeBudget.cs" Link="Commons\TimeBudget.cs" />
     <Compile Include="..\..\vostok.commons.helpers\Vostok.Commons.Helpers\Observable\CachingObservable.cs" Link="Commons\CachingObservable.cs" />
+    <Compile Include="..\..\vostok.clusterconfig.core\Vostok.ClusterConfig.Core\Http\ClusterConfigHeaderNames.cs" Link="Core\ClusterConfigHeaderNames.cs" />
+    <Compile Include="..\..\vostok.clusterconfig.core\Vostok.ClusterConfig.Core\Http\ClusterConfigQueryParameters.cs" Link="Core\ClusterConfigQueryParameters.cs" />
   </ItemGroup>
   <Import Project="..\..\vostok.commons.binary\BinaryBufferReader.props" Condition="Exists('..\..\vostok.commons.binary\BinaryBufferReader.props')" />
   <Import Project="..\..\vostok.commons.binary\BinaryBufferWriter.props" Condition="Exists('..\..\vostok.commons.binary\BinaryBufferWriter.props')" />
