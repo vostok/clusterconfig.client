@@ -87,6 +87,10 @@ namespace Vostok.ClusterConfig.Client
         /// </summary>
         public int MaximumFileSize { get; set; } = ClusterConfigClientDefaults.MaximumFileSize;
 
+        /// <summary>
+        /// If that parameter specified (not null), then ClusterConfigClient should ignore all server's recommendations about communication protocol:
+        /// ClusterConfigClient will use specified protocol version.
+        /// </summary>
         public ProtocolVersion? ForcedProtocolVersion { get; set; } = null;
         
         /// <summary>
