@@ -49,7 +49,8 @@ namespace Vostok.ClusterConfig.Client.Updaters
             if (!enabled)
                 return CreateEmptyResult(lastResult);
 
-            var request = CreateRequest(protocol, lastResult?.Version, lastResult?.Tree?.Protocol);
+            var fullReason = FindFullZoneRequestReasons(protocol, lastResult);    
+            var request = CreateRequest(protocol, lastResult?.Version, fullReason);
             var requestPriority = lastResult == null ? RequestPriority.Critical : RequestPriority.Ordinary;
             var requestResult = await client.SendAsync(request, priority: requestPriority, cancellationToken: cancellationToken).ConfigureAwait(false);
 
@@ -62,9 +63,17 @@ namespace Vostok.ClusterConfig.Client.Updaters
             return requestResult.Response.Code switch
             {
                 ResponseCode.NotModified => HandleNotModifiedResponse(lastResult, requestResult.Response),
-                ResponseCode.Ok or ResponseCode.PartialContent => HandleSuccessResponse(protocol, lastResult, requestResult.Response, requestResult.Replica),
+                ResponseCode.Ok or ResponseCode.PartialContent => HandleSuccessResponse(protocol, lastResult, requestResult.Response, requestResult.Replica, fullReason),
                 _ => throw NoAcceptableResponseException(requestResult)
             };
+        }
+
+        [CanBeNull] private string FindFullZoneRequestReasons(ProtocolVersion protocol, RemoteUpdateResult lastResult)
+        {
+            if (lastResult?.Tree?.Protocol == null)
+                return ClusterConfigQueryParameters.ForceFullReasonNoPrevious;
+
+            return protocol != lastResult.Tree.Protocol ? ClusterConfigQueryParameters.ForceFullReasonProtocolChanged : null;
         }
 
         private static ClusterClient CreateClient(IClusterProvider cluster, ClusterClientSetup setup, ILog log, TimeSpan timeout)
@@ -116,7 +125,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
         private static RemoteUpdateResult CreateEmptyResult([CanBeNull] RemoteUpdateResult lastResult)
             => new(lastResult?.Version != EmptyResultVersion, null, EmptyResultVersion, lastResult?.RecommendedProtocol);
 
-        private Request CreateRequest(ProtocolVersion protocol, DateTime? lastVersion, ProtocolVersion? lastProtocol)
+        private Request CreateRequest(ProtocolVersion protocol, DateTime? lastVersion, [CanBeNull] string fullReason)
         {
             var request = Request.Get(protocol.GetUrlPath())
                 .WithAdditionalQueryParameter("zoneName", zone)
@@ -126,10 +135,8 @@ namespace Vostok.ClusterConfig.Client.Updaters
             if (lastVersion.HasValue)
                 request = request.WithIfModifiedSinceHeader(lastVersion.Value);
 
-            if (lastProtocol == null)
-                request = request.WithAdditionalQueryParameter(ClusterConfigQueryParameters.ForceFullQueryKey, ClusterConfigQueryParameters.ForceFullReasonNoPrevious);
-            else if (protocol != lastProtocol)
-                request = request.WithAdditionalQueryParameter(ClusterConfigQueryParameters.ForceFullQueryKey, ClusterConfigQueryParameters.ForceFullReasonProtocolChanged);
+            if (fullReason != null)
+                request = request.WithAdditionalQueryParameter(ClusterConfigQueryParameters.ForceFullQueryKey, fullReason);
 
             return request;
         }
@@ -182,7 +189,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
         }
 
         [NotNull]
-        private RemoteUpdateResult HandleSuccessResponse(ProtocolVersion protocol, RemoteUpdateResult lastUpdateResult, Response response, Uri replica)
+        private RemoteUpdateResult HandleSuccessResponse(ProtocolVersion protocol, RemoteUpdateResult lastUpdateResult, Response response, Uri replica, [CanBeNull] string fullReason)
         {
             if (!response.HasContent)
                 throw new RemoteUpdateException($"Received an empty {response.Code} response from server. Nothing to deserialize.");
@@ -190,6 +197,9 @@ namespace Vostok.ClusterConfig.Client.Updaters
             if (response.Headers.LastModified == null)
                 throw new RemoteUpdateException($"Received a {response.Code} response without 'LastModified' header.");
 
+            if (fullReason != null && response.Code == ResponseCode.PartialContent)
+                throw new RemoteUpdateException($"Expected full zone (because {fullReason}), but received patch.");
+            
             var recommendedProtocol = GetRecommendedProtocolVersion(response);
             
             var version = DateTime.Parse(response.Headers.LastModified, null, DateTimeStyles.AssumeUniversal).ToUniversalTime();
@@ -237,7 +247,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
             return new RemoteUpdateResult(true, tree, version, recommendedProtocol);
         }
-
+        
         private ProtocolVersion? GetRecommendedProtocolVersion(Response response) =>
             response.Headers[ClusterConfigHeaderNames.RecommendedProtocol] is {} header
                 ? Enum.TryParse<ProtocolVersion>(header, out var value) ? value : null
