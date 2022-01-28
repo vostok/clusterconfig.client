@@ -1,8 +1,8 @@
 namespace Vostok.ClusterConfig.Client.Updaters
 {
-    public static class ClusterConfigHeaderNames
+    internal static class ClusterConfigHeaderNames
     {
-        public const string RecommendedProtocol = "X-Kontur-ClusterConfig-RecommendedProtocol";
-        public const string ReplicaName = "X-Kontur-ClusterConfig-Replica";
+        public const string RecommendedProtocol = "ClusterConfig-RecommendedProtocol";
+        public const string ReplicaName = "ClusterConfig-Replica";
     }
 }

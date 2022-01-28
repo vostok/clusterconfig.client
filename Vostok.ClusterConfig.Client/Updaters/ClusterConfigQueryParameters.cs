@@ -1,6 +1,6 @@
 namespace Vostok.ClusterConfig.Client.Updaters
 {
-    public static class ClusterConfigQueryParameters
+    internal static class ClusterConfigQueryParameters
     {
         public const string ForceFullQueryKey = "forceFull";
 
