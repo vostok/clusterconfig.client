@@ -7,7 +7,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
 {
     internal class RemoteUpdateResult
     {
-        public RemoteUpdateResult(bool changed, [CanBeNull] RemoteTree tree, DateTime version, ProtocolVersion? recommendedProtocol)
+        public RemoteUpdateResult(bool changed, [CanBeNull] RemoteTree tree, DateTime version, ClusterConfigProtocolVersion? recommendedProtocol)
         {
             Changed = changed;
             Tree = tree;
@@ -22,6 +22,6 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
         public DateTime Version { get; }
         
-        public ProtocolVersion? RecommendedProtocol { get; }
+        public ClusterConfigProtocolVersion? RecommendedProtocol { get; }
     }
 }

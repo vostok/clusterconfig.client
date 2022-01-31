@@ -14,11 +14,11 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 {
     internal class TestServer : IDisposable
     {
-        private readonly ProtocolVersion protocol;
+        private readonly ClusterConfigProtocolVersion protocol;
         private readonly HttpListener listener;
         private volatile Response response;
 
-        public TestServer(ProtocolVersion protocol)
+        public TestServer(ClusterConfigProtocolVersion protocol)
         {
             this.protocol = protocol;
             Port = FreeTcpPortFinder.GetFreePort();

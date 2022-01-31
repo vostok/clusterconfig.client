@@ -10,16 +10,16 @@ using Vostok.Configuration.Abstractions.SettingsTree;
 
 namespace Vostok.ClusterConfig.Client.Tests.Helpers
 {
-    [TestFixture(ProtocolVersion.V1)]
-    [TestFixture(ProtocolVersion.V2)]
+    [TestFixture(ClusterConfigProtocolVersion.V1)]
+    [TestFixture(ClusterConfigProtocolVersion.V2)]
     internal class TreeExtractor_Tests
     {
-        private readonly ProtocolVersion protocol;
+        private readonly ClusterConfigProtocolVersion protocol;
         private ISettingsNode localTree;
         private ISettingsNode remoteTree;
         private ClusterConfigClientState state;
 
-        public TreeExtractor_Tests(ProtocolVersion protocol) => this.protocol = protocol;
+        public TreeExtractor_Tests(ClusterConfigProtocolVersion protocol) => this.protocol = protocol;
 
         [SetUp]
         public void TestSetup()

@@ -20,11 +20,11 @@ using Vostok.Logging.Console;
 
 namespace Vostok.ClusterConfig.Client.Tests.Updaters
 {
-    [TestFixture(ProtocolVersion.V1)]
-    [TestFixture(ProtocolVersion.V2)]
+    [TestFixture(ClusterConfigProtocolVersion.V1)]
+    [TestFixture(ClusterConfigProtocolVersion.V2)]
     internal class RemoteUpdater_Tests
     {
-        private readonly ProtocolVersion protocol;
+        private readonly ClusterConfigProtocolVersion protocol;
         private IClusterClient client;
         private ILog log;
 
@@ -39,7 +39,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         private DateTime version1;
         private DateTime version2;
 
-        public RemoteUpdater_Tests(ProtocolVersion protocol) => this.protocol = protocol;
+        public RemoteUpdater_Tests(ClusterConfigProtocolVersion protocol) => this.protocol = protocol;
 
         [SetUp]
         public void TestSetup()
