@@ -18,11 +18,11 @@ using Vostok.Logging.Console;
 
 namespace Vostok.ClusterConfig.Client.Tests.Functional
 {
-    [TestFixture(ProtocolVersion.V1)]
-    [TestFixture(ProtocolVersion.V2)]
+    [TestFixture(ClusterConfigProtocolVersion.V1)]
+    [TestFixture(ClusterConfigProtocolVersion.V2)]
     internal class FunctionalTests
     {
-        private readonly ProtocolVersion protocol;
+        private readonly ClusterConfigProtocolVersion protocol;
         private TestServer server;
         private TestFolder folder;
         private TestObserver<(ISettingsNode, long)> observer;
@@ -38,7 +38,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         private DateTime version1;
         private DateTime version2;
 
-        public FunctionalTests(ProtocolVersion protocol) => this.protocol = protocol;
+        public FunctionalTests(ClusterConfigProtocolVersion protocol) => this.protocol = protocol;
 
         [SetUp]
         public void TestSetup()
