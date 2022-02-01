@@ -51,7 +51,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 return CreateEmptyResult(lastResult);
 
             var protocolChanged = lastResult?.Tree?.Protocol is {} lastProtocol && lastProtocol != protocol;    
-            var request = CreateRequest(protocol, lastResult?.Version, protocolChanged);
+            var request = CreateRequest(protocol, lastResult?.Version, protocolChanged, lastResult?.HashMismatch ?? false);
             var requestPriority = lastResult == null ? RequestPriority.Critical : RequestPriority.Ordinary;
             var requestResult = await client.SendAsync(request, priority: requestPriority, cancellationToken: cancellationToken).ConfigureAwait(false);
 
@@ -116,19 +116,25 @@ namespace Vostok.ClusterConfig.Client.Updaters
         }
 
         private static RemoteUpdateResult CreateEmptyResult([CanBeNull] RemoteUpdateResult lastResult)
-            => new(lastResult?.Version != EmptyResultVersion, null, EmptyResultVersion, lastResult?.RecommendedProtocol);
+            => new(lastResult?.Version != EmptyResultVersion, null, EmptyResultVersion, lastResult?.RecommendedProtocol, lastResult?.HashMismatch ?? false);
 
-        private Request CreateRequest(ClusterConfigProtocolVersion protocol, DateTime? lastVersion, bool protocolChanged)
+        private static RemoteUpdateResult CreateHashMismatchResult([CanBeNull] RemoteUpdateResult lastResult, ClusterConfigProtocolVersion? recommendedProtocol)
+            => new(false, lastResult?.Tree, lastResult?.Version ?? EmptyResultVersion, recommendedProtocol, true);
+
+        private Request CreateRequest(ClusterConfigProtocolVersion protocol, DateTime? lastVersion, bool protocolChanged, bool hashMismatch)
         {
             var request = Request.Get(protocol.GetUrlPath())
                 .WithAdditionalQueryParameter("zoneName", zone)
                 .WithAcceptHeader("application/octet-stream")
                 .WithAcceptEncodingHeader("gzip");
 
-            if (lastVersion.HasValue)
+            if (lastVersion.HasValue && !hashMismatch)
                 request = request.WithIfModifiedSinceHeader(lastVersion.Value);
 
-            if (protocolChanged)
+            if (hashMismatch) // (a.tolstov): On hash mismatch we don't send previous zone version,
+                              // but anyway we should send forceFull=hashMismatch query parameter for save metric about problem on server-side.
+                request = request.WithAdditionalQueryParameter(ClusterConfigQueryParameters.ForceFull, "hashMismatch");
+            else if (protocolChanged)
                 request = request.WithAdditionalQueryParameter(ClusterConfigQueryParameters.ForceFull, "protocolChanged");
 
             return request;
@@ -178,7 +184,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             if (lastUpdateResult == null)
                 throw UnexpectedNotModifiedResponseException();
 
-            return new RemoteUpdateResult(false, lastUpdateResult.Tree, lastUpdateResult.Version, GetRecommendedProtocolVersion(response));
+            return new RemoteUpdateResult(false, lastUpdateResult.Tree, lastUpdateResult.Version, GetRecommendedProtocolVersion(response), lastUpdateResult.HashMismatch);
         }
 
         [NotNull]
@@ -202,24 +208,27 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 if (version < lastUpdateResult.Version)
                     LogStaleVersion(version, lastUpdateResult.Version, protocol);
 
-                return new RemoteUpdateResult(false, lastUpdateResult.Tree, lastUpdateResult.Version, recommendedProtocol);
+                return new RemoteUpdateResult(false, lastUpdateResult.Tree, lastUpdateResult.Version, recommendedProtocol, lastUpdateResult.HashMismatch);
             }
 
             return response.Code switch
             {
-                ResponseCode.Ok => CreateResultViaFullZone(protocol, response, version, replica, recommendedProtocol),
+                ResponseCode.Ok => CreateResultViaFullZone(protocol, response, version, replica, lastUpdateResult, recommendedProtocol),
                 ResponseCode.PartialContent => CreateResultViaPatch(protocol, response, version, replica, lastUpdateResult, recommendedProtocol),
                 var code => throw new RemoteUpdateException($"Failed to update settings from server: unknown successful response code {code}")
             };
         }
 
-        private RemoteUpdateResult CreateResultViaFullZone(ClusterConfigProtocolVersion protocol, Response response, DateTime version, Uri replica, ClusterConfigProtocolVersion? recommendedProtocol)
+        private RemoteUpdateResult CreateResultViaFullZone(ClusterConfigProtocolVersion protocol, Response response, DateTime version, Uri replica, RemoteUpdateResult lastResult, ClusterConfigProtocolVersion? recommendedProtocol)
         {
             var tree = new RemoteTree(protocol, response.Content.ToArray(), protocol.GetSerializer());
 
+            if (!EnsureHashValid(tree.Serialized, response, version, false))
+                return CreateHashMismatchResult(lastResult, recommendedProtocol);
+
             LogReceivedNewZone(tree, version, replica, false, protocol);
 
-            return new RemoteUpdateResult(true, tree, version, recommendedProtocol);
+            return new RemoteUpdateResult(true, tree, version, recommendedProtocol, false);
         }
 
         private RemoteUpdateResult CreateResultViaPatch(ClusterConfigProtocolVersion protocol, Response response, DateTime version, Uri replica, RemoteUpdateResult lastResult, ClusterConfigProtocolVersion? recommendedProtocol)
@@ -234,11 +243,16 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 throw new RemoteUpdateException($"Received 206 response from server, but can't apply {protocol} patch to {lastResult.Tree.Protocol} tree.");
             
             var patch = response.Content.ToArray();
-            var tree = new RemoteTree(protocol, protocol.GetPatcher().ApplyPatch(lastResult.Tree.Serialized, patch), protocol.GetSerializer());
+            var newZone = protocol.GetPatcher().ApplyPatch(lastResult.Tree.Serialized, patch);
+
+            if (!EnsureHashValid(newZone, response, version, true))
+                return CreateHashMismatchResult(lastResult, recommendedProtocol);
+
+            var tree = new RemoteTree(protocol, newZone, protocol.GetSerializer());
 
             LogReceivedNewZone(tree, version, replica, true, protocol);
 
-            return new RemoteUpdateResult(true, tree, version, recommendedProtocol);
+            return new RemoteUpdateResult(true, tree, version, recommendedProtocol, false);
         }
         
         private ClusterConfigProtocolVersion? GetRecommendedProtocolVersion(Response response) =>
@@ -246,6 +260,21 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 ? Enum.TryParse<ClusterConfigProtocolVersion>(header, out var value) ? value : null
                 : null;
 
+        private bool EnsureHashValid(byte[] serialized, Response response, DateTime newVersion, bool isPatch)
+        {
+            var expectedHash = response.Headers[ClusterConfigHeaderNames.ZoneHash];
+            if (expectedHash == null)
+                return true;
+
+            var hash = serialized.GetSha256Str();
+            if (hash == expectedHash)
+                return true;
+
+            log.Error($"Detected hash mismatch: {hash} != {expectedHash}. New version is {newVersion}, is patch: {isPatch}.");
+            
+            return false;
+        }
+        
         #region Logging
 
         private void LogAssumingNoServer()
