@@ -125,7 +125,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(ClusterResultStatus.ReplicasNotFound);
 
-            Action action = () => Update(new RemoteUpdateResult(false, tree1, version1, null, false));
+            Action action = () => Update(new RemoteUpdateResult(false, tree1, version1, null, null));
 
             Console.Out.WriteLine(action.Should().Throw<RemoteUpdateException>().Which);
         }
@@ -138,7 +138,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(status);
 
-            Action action = () => Update(new RemoteUpdateResult(false, tree1, version1, null, false));
+            Action action = () => Update(new RemoteUpdateResult(false, tree1, version1, null, null));
 
             Console.Out.WriteLine(action.Should().Throw<RemoteUpdateException>().Which);
         }
@@ -154,7 +154,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
                 ResponseCode.ReceiveFailure,
                 ResponseCode.ServiceUnavailable);
 
-            Action action = () => Update(new RemoteUpdateResult(false, tree1, version1, null, false));
+            Action action = () => Update(new RemoteUpdateResult(false, tree1, version1, null, null));
 
             Console.Out.WriteLine(action.Should().Throw<RemoteUpdateException>().Which);
         }
@@ -194,7 +194,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(ResponseCode.NotModified);
 
-            var result = Update(new RemoteUpdateResult(true, tree1, version1, null, false));
+            var result = Update(new RemoteUpdateResult(true, tree1, version1, null, null));
 
             result.Changed.Should().BeFalse();
             result.Tree.Should().BeSameAs(tree1);
@@ -226,7 +226,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(tree1.Serialized, version1);
 
-            var result = Update(new RemoteUpdateResult(false, tree2, version2, null, false));
+            var result = Update(new RemoteUpdateResult(false, tree2, version2, null, null));
 
             result.Changed.Should().BeFalse();
             result.Tree.Should().BeSameAs(tree2);
@@ -250,7 +250,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(tree2.Serialized, version2);
 
-            var result = Update(new RemoteUpdateResult(false, tree1, version1, null, false));
+            var result = Update(new RemoteUpdateResult(false, tree1, version1, null, null));
 
             result.Changed.Should().BeTrue();
             result.Tree?.Serialized.Should().Equal(tree2.Serialized);
@@ -262,7 +262,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(tree2.Serialized, version2);
 
-            var result = Update(new RemoteUpdateResult(false, tree2, version2, null, false));
+            var result = Update(new RemoteUpdateResult(false, tree2, version2, null, null));
 
             result.Changed.Should().BeFalse();
             result.Tree?.Serialized.Should().Equal(tree2.Serialized);

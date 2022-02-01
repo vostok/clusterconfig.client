@@ -12,13 +12,13 @@ namespace Vostok.ClusterConfig.Client.Updaters
             [CanBeNull] RemoteTree tree,
             DateTime version,
             ClusterConfigProtocolVersion? recommendedProtocol,
-            bool hashMismatch)
+            PatchingFailedReason? patchingFailedReason)
         {
             Changed = changed;
             Tree = tree;
             Version = version;
             RecommendedProtocol = recommendedProtocol;
-            HashMismatch = hashMismatch;
+            PatchingFailedReason = patchingFailedReason;
         }
 
         public bool Changed { get; }
@@ -30,6 +30,6 @@ namespace Vostok.ClusterConfig.Client.Updaters
         
         public ClusterConfigProtocolVersion? RecommendedProtocol { get; }
         
-        public bool HashMismatch { get; }
+        public PatchingFailedReason? PatchingFailedReason { get; }
     }
 }
