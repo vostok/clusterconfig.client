@@ -260,7 +260,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             }
             catch (Exception e)
             {
-                log.Error(e, "Can't apply patch {PatchVersion} to {OldVersion} (protocol {Protocol})", version, old.Version, protocol);
+                log.Error(e, "Can't apply patch {PatchVersion} to {OldVersion} (protocol {Protocol}).", version, old.Version, protocol);
                 
                 newZone = null;
                 return false;
