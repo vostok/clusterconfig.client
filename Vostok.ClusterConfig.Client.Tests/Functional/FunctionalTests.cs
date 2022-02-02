@@ -340,8 +340,6 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         [Test]
         public void Should_stay_calm_and_return_cached_data_if_a_regular_update_fails()
         {
-            using var _ = ShouldNotLog(LogLevel.Warn, LogLevel.Error, LogLevel.Fatal);
-
             server.SetResponse(remoteTree2, version2);
 
             VerifyResults("", 1, remoteTree2);
