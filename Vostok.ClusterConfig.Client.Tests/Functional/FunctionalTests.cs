@@ -550,8 +550,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         public void Should_obtain_update_via_patch()
         {
             if (protocol != ClusterConfigProtocolVersion.V2)
-                Assert.Ignore();
-            
+                return;
+
             using var _ = ShouldNotLog(LogLevel.Warn, LogLevel.Error, LogLevel.Fatal);
 
             folder.CreateFile("local", b => b.Append("value-1"));
@@ -571,7 +571,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         public void Should_obtain_update_via_full_zone_when_patch_hash_mismatched()
         {
             if (protocol != ClusterConfigProtocolVersion.V2)
-                Assert.Ignore();
+                return;
             
             folder.CreateFile("local", b => b.Append("value-1"));
 
@@ -598,7 +598,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         public void Should_obtain_update_via_full_zone_when_patch_is_broken()
         {
             if (protocol != ClusterConfigProtocolVersion.V2)
-                Assert.Ignore();
+                return;
             
             folder.CreateFile("local", b => b.Append("value-1"));
 
