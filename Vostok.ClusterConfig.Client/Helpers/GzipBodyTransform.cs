@@ -9,7 +9,7 @@ namespace Vostok.ClusterConfig.Client.Helpers
     {
         public Response Transform(Response response)
         {
-            if (response.Code != ResponseCode.Ok)
+            if (response.Code is not (ResponseCode.Ok or ResponseCode.PartialContent))
                 return response;
 
             if (!response.HasContent)

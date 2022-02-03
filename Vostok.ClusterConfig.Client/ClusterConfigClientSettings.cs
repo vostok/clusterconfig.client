@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using JetBrains.Annotations;
 using Vostok.Clusterclient.Core;
 using Vostok.Clusterclient.Core.Topology;
+using Vostok.ClusterConfig.Client.Abstractions;
 using Vostok.Configuration.Abstractions.Merging;
 using Vostok.Logging.Abstractions;
 
@@ -86,6 +87,12 @@ namespace Vostok.ClusterConfig.Client
         /// </summary>
         public int MaximumFileSize { get; set; } = ClusterConfigClientDefaults.MaximumFileSize;
 
+        /// <summary>
+        /// <para>Forces <see cref="ClusterConfigProtocolVersion"/> if specified.</para>
+        /// <para>Otherwise server's recommended <see cref="ClusterConfigProtocolVersion"/> will be used.</para>
+        /// </summary>
+        public ClusterConfigProtocolVersion? ForcedProtocolVersion { get; set; }
+        
         /// <summary>
         /// <para>An optional delegate that can be used to tune underlying <see cref="IClusterClient"/> instance.</para>
         /// </summary>

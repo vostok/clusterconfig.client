@@ -1,26 +1,38 @@
 ﻿using System;
+using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Concurrency;
 using System.Reactive.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using FluentAssertions.Extensions;
+using NSubstitute;
 using NUnit.Framework;
 using Vostok.Clusterclient.Core.Model;
 using Vostok.Clusterclient.Core.Topology;
 using Vostok.ClusterConfig.Client.Abstractions;
+using Vostok.ClusterConfig.Core.Serialization;
 using Vostok.Commons.Testing;
 using Vostok.Commons.Testing.Observable;
 using Vostok.Configuration.Abstractions.SettingsTree;
+using Vostok.Logging.Abstractions;
 using Vostok.Logging.Console;
 
 namespace Vostok.ClusterConfig.Client.Tests.Functional
 {
-    [TestFixture]
+    [TestFixture(ClusterConfigProtocolVersion.V1)]
+    [TestFixture(ClusterConfigProtocolVersion.V2)]
     internal class FunctionalTests
     {
+        private const string UpdatedTemplate = "Received new version of zone '{Zone}' from {Replica}. Size = {Size}. Version = {Version}. Protocol = {Protocol}. Patch = {IsPatch}.";
+        private const string HashMismatchTemplate = "Detected hash mismatch: {ActualHash} != {ExpectedHash}. New version is {NewVersion}, is patch: {IsPatch}.";
+        private const string ApplyPatchErrorTemplate = "Can't apply patch {PatchVersion} to {OldVersion} (protocol {Protocol}).";
+        
+        private readonly ClusterConfigProtocolVersion protocol;
         private TestServer server;
         private TestFolder folder;
         private TestObserver<(ISettingsNode, long)> observer;
@@ -35,16 +47,24 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 
         private DateTime version1;
         private DateTime version2;
+        private ILog log;
+
+        public FunctionalTests(ClusterConfigProtocolVersion protocol) => this.protocol = protocol;
 
         [SetUp]
         public void TestSetup()
         {
             folder = new TestFolder();
 
-            server = new TestServer();
+            server = new TestServer(protocol);
             server.Start();
 
             observer = new TestObserver<(ISettingsNode, long)>();
+
+            log = Substitute.For<ILog>();
+            log.IsEnabledFor(Arg.Any<LogLevel>()).ReturnsForAnyArgs(true);
+            log.ForContext(Arg.Any<string>()).ReturnsForAnyArgs(log);
+            log.IsEnabledFor(LogLevel.Info).Should().BeTrue();
 
             settings = new ClusterConfigClientSettings
             {
@@ -53,7 +73,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
                 LocalFolder = folder.Directory.FullName,
                 Cluster = new FixedClusterProvider(new Uri(server.Url)),
                 UpdatePeriod = 250.Milliseconds(),
-                Log = new SynchronousConsoleLog()
+                Log = new CompositeLog(log, new SynchronousConsoleLog()),
+                ForcedProtocolVersion = protocol
             };
 
             client = new ClusterConfigClient(settings);
@@ -140,6 +161,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         [Test]
         public void Should_receive_remote_tree_when_local_settings_are_disabled()
         {
+            using var _ = ShouldNotLog(LogLevel.Warn, LogLevel.Error, LogLevel.Fatal);
+            
             ModifySettings(s => s.EnableLocalSettings = false);
 
             server.SetResponse(remoteTree1, version1);
@@ -151,6 +174,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         [Test]
         public void Should_reflect_updates_in_remote_tree_when_local_settings_are_disabled()
         {
+            using var _ = ShouldNotLog(LogLevel.Warn, LogLevel.Error, LogLevel.Fatal);
+
             ModifySettings(s => s.EnableLocalSettings = false);
 
             server.SetResponse(remoteTree1, version1);
@@ -167,6 +192,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         [Test]
         public void Should_merge_local_and_remote_trees()
         {
+            using var _ = ShouldNotLog(LogLevel.Warn, LogLevel.Error, LogLevel.Fatal);
+
             folder.CreateFile("local", b => b.Append("value-1"));
 
             server.SetResponse(remoteTree1, version1);
@@ -177,6 +204,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         [Test]
         public void Should_reflect_changes_in_both_local_and_remote_trees_at_the_same_time()
         {
+            using var _ = ShouldNotLog(LogLevel.Warn, LogLevel.Error, LogLevel.Fatal);
+
             folder.CreateFile("local", b => b.Append("value-1"));
 
             server.SetResponse(remoteTree1, version1);
@@ -281,6 +310,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         [Test]
         public void Should_not_change_existing_settings_when_server_says_nothing_has_been_modified()
         {
+            using var _ = ShouldNotLog(LogLevel.Warn, LogLevel.Error, LogLevel.Fatal);
+
             server.SetResponse(remoteTree2, version2);
 
             VerifyResults("", 1, remoteTree2);
@@ -514,6 +545,89 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
                 assertion.ShouldPassIn(5.Seconds());
             }
         }
+        
+        [Test]
+        public void Should_obtain_update_via_patch()
+        {
+            if (protocol != ClusterConfigProtocolVersion.V2)
+                return;
+
+            using var _ = ShouldNotLog(LogLevel.Warn, LogLevel.Error, LogLevel.Fatal);
+
+            folder.CreateFile("local", b => b.Append("value-1"));
+
+            server.SetResponse(remoteTree1, version1);
+
+            VerifyResults(default, 1, remoteTree1.Merge(localTree1));
+            
+            server.SetPatchResponse(remoteTree1, remoteTree2, version2, false);
+            
+            VerifyResults(default, 2, remoteTree2.Merge(localTree1));
+            
+            log.Received().Log(Arg.Is<LogEvent>(e => e.Level == LogLevel.Info && e.MessageTemplate == UpdatedTemplate && e.Properties["IsPatch"].ToString() == "True"));
+        }
+        
+        [Test]
+        public void Should_obtain_update_via_full_zone_when_patch_hash_mismatched()
+        {
+            if (protocol != ClusterConfigProtocolVersion.V2)
+                return;
+            
+            folder.CreateFile("local", b => b.Append("value-1"));
+
+            server.SetResponse(remoteTree1, version1);
+
+            VerifyResults(default, 1, remoteTree1.Merge(localTree1));
+            
+            server.SetPatchResponse(remoteTree1, remoteTree2, version2, true);
+            
+            ((Action) (() => log.Received().Log(Arg.Is<LogEvent>(e => e.Level == LogLevel.Error && e.MessageTemplate == HashMismatchTemplate)))).ShouldPassIn(10.Seconds());
+            
+            ((Action) (() => server.AsserRequest(r => r.Query.Should().Contain("forceFull=HashMismatch")))).ShouldPassIn(10.Seconds());
+            
+            log.ClearReceivedCalls();
+            
+            server.SetResponse(remoteTree2, version2);
+            
+            VerifyResults(default, 2, remoteTree2.Merge(localTree1));
+            
+            log.Received().Log(Arg.Is<LogEvent>(e => e.Level == LogLevel.Info && e.MessageTemplate == UpdatedTemplate && e.Properties["IsPatch"].ToString() == "False"));
+        }
+        
+        [Test]
+        public void Should_obtain_update_via_full_zone_when_patch_is_broken()
+        {
+            if (protocol != ClusterConfigProtocolVersion.V2)
+                return;
+            
+            folder.CreateFile("local", b => b.Append("value-1"));
+
+            server.SetResponse(remoteTree1, version1);
+
+            VerifyResults(default, 1, remoteTree1.Merge(localTree1));
+            
+            var buffer = new MemoryStream();
+
+            using (var gzip = new GZipStream(buffer, CompressionMode.Compress))
+            {
+                gzip.Write(Enumerable.Range(0, 100).Select(i => (byte) i).ToArray(), 0, 100);
+                gzip.Flush();
+            }
+
+            server.SetPatchResponse(buffer.ToArray(), "blablabla", version2);
+            
+            ((Action) (() => log.Received().Log(Arg.Is<LogEvent>(e => e.Level == LogLevel.Error && e.MessageTemplate == ApplyPatchErrorTemplate && e.Exception != null)))).ShouldPassIn(10.Seconds());
+            
+            ((Action) (() => server.AsserRequest(r => r.Query.Should().Contain("forceFull=ApplyPatchFailed")))).ShouldPassIn(10.Seconds());
+            
+            log.ClearReceivedCalls();
+            
+            server.SetResponse(remoteTree2, version2);
+            
+            VerifyResults(default, 2, remoteTree2.Merge(localTree1));
+            
+            log.Received().Log(Arg.Is<LogEvent>(e => e.Level == LogLevel.Info && e.MessageTemplate == UpdatedTemplate && e.Properties["IsPatch"].ToString() == "False"));
+        }
 
         private void ModifySettings(Action<ClusterConfigClientSettings> modify)
         {
@@ -589,6 +703,22 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             Action assertion = () => observer.Messages.Should().ContainSingle().Which.Kind.Should().Be(NotificationKind.OnError);
 
             assertion.ShouldPassIn(10.Seconds());
+        }
+
+        private IDisposable ShouldNotLog(params LogLevel[] deniedLevels)
+        {
+            log.ClearReceivedCalls();
+
+            return new ActionDisposable(() => log.DidNotReceive().Log(Arg.Is<LogEvent>(e => deniedLevels.Contains(e.Level))));
+        }
+
+        private class ActionDisposable : IDisposable
+        {
+            private readonly Action action;
+
+            public ActionDisposable(Action action) => this.action = action;
+
+            public void Dispose() => action();
         }
     }
 }
