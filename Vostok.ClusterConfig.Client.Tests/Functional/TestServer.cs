@@ -4,7 +4,11 @@ using System.IO.Compression;
 using System.Net;
 using System.Threading.Tasks;
 using Vostok.Clusterclient.Core.Model;
-using Vostok.ClusterConfig.Core.Serialization;
+using Vostok.ClusterConfig.Client.Abstractions;
+using Vostok.ClusterConfig.Client.Helpers;
+using Vostok.ClusterConfig.Core.Http;
+using Vostok.ClusterConfig.Core.Patching;
+using Vostok.ClusterConfig.Core.Utils;
 using Vostok.Commons.Binary;
 using Vostok.Commons.Helpers.Network;
 using Vostok.Configuration.Abstractions.SettingsTree;
@@ -13,11 +17,14 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 {
     internal class TestServer : IDisposable
     {
+        private readonly ClusterConfigProtocolVersion protocol;
         private readonly HttpListener listener;
         private volatile Response response;
+        private volatile Uri request;
 
-        public TestServer()
+        public TestServer(ClusterConfigProtocolVersion protocol)
         {
+            this.protocol = protocol;
             Port = FreeTcpPortFinder.GetFreePort();
 
             listener = new HttpListener();
@@ -53,10 +60,34 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             => response = new Response(code);
 
         public void SetResponse(ISettingsNode tree, DateTime version)
-            => response = Responses.Ok
+        {
+            var serialized = SerializeTree(tree, out var hash);
+            
+            response = Responses.Ok
                 .WithHeader(HeaderNames.LastModified, version.ToString("R"))
                 .WithHeader(HeaderNames.ContentEncoding, "gzip")
-                .WithContent(SerializeTree(tree));
+                .WithHeader(ClusterConfigHeaderNames.ZoneHash, hash)
+                .WithContent(serialized);
+        }
+
+        public void SetPatchResponse(ISettingsNode old, ISettingsNode @new, DateTime version, bool wrongHash)
+        {
+            var serialized = SerializeTree(new Patcher().GetPatch(old, @new), out _);
+            SerializeTree(@new, out var hash);
+            
+            SetPatchResponse(serialized, hash + (wrongHash ? "_WRONG_HASH" : ""), version);
+        }
+        
+        public void SetPatchResponse(byte[] patch, string hash, DateTime version)
+        {
+            response = Responses.PartialContent
+                .WithHeader(HeaderNames.LastModified, version.ToString("R"))
+                .WithHeader(HeaderNames.ContentEncoding, "gzip")
+                .WithHeader(ClusterConfigHeaderNames.ZoneHash, hash)
+                .WithContent(patch);
+        }
+
+        public void AsserRequest(Action<Uri> validate) => validate(request);
 
         private void RequestHandlingLoop()
         {
@@ -70,6 +101,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 
         private async Task RespondAsync(HttpListenerContext context)
         {
+            request = context.Request.Url;
+            
             context.Response.StatusCode = (int) response.Code;
 
             if (response.HasHeaders)
@@ -88,12 +121,14 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             context.Response.Close();
         }
 
-        private static byte[] SerializeTree(ISettingsNode tree)
+        private byte[] SerializeTree(ISettingsNode tree, out string hash)
         {
             var writer = new BinaryBufferWriter(64);
 
-            TreeSerializers.V1.Serialize(tree, writer);
+            protocol.GetSerializer().Serialize(tree, writer);
 
+            hash = writer.Buffer.GetSha256Str(0, writer.Length);
+            
             var buffer = new MemoryStream();
 
             using (var gzip = new GZipStream(buffer, CompressionMode.Compress))
