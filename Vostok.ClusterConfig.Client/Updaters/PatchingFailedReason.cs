@@ -1,7 +1,8 @@
-namespace Vostok.ClusterConfig.Client.Updaters;
-
-internal enum PatchingFailedReason
+namespace Vostok.ClusterConfig.Client.Updaters
 {
-    HashMismatch,
-    ApplyPatchFailed
+    internal enum PatchingFailedReason
+    {
+        HashMismatch,
+        ApplyPatchFailed
+    }
 }
