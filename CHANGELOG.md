@@ -1,3 +1,7 @@
+## 0.2.0 (04-02-2022):
+
+Added protocol V2
+
 ## 0.1.18 (13-01-2022):
 
 Reduced memory traffic and added several optimizations to the hot pathes.
