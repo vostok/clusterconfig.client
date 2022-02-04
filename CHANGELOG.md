@@ -1,3 +1,7 @@
+## 0.2.15 (04-02-2022):
+
+Fix versions order
+
 ## 0.2.0 (04-02-2022):
 
 Added protocol V2
