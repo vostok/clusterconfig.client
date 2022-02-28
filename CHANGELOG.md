@@ -1,3 +1,7 @@
+## 0.2.16 (28-02-2022):
+
+Change defult protocol to V2
+
 ## 0.2.15 (04-02-2022):
 
 Fix versions order
