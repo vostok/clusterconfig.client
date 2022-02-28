@@ -189,15 +189,12 @@ namespace Vostok.ClusterConfig.Client.Updaters
         [NotNull]
         private RemoteUpdateResult HandleSuccessResponse(ClusterConfigProtocolVersion protocol, RemoteUpdateResult lastUpdateResult, Response response, Uri replica, bool protocolChanged)
         {
-            if (!response.HasContent)
-                throw new RemoteUpdateException($"Received an empty {response.Code} response from server. Nothing to deserialize.");
-
             if (response.Headers.LastModified == null)
                 throw new RemoteUpdateException($"Received a {response.Code} response without 'LastModified' header.");
 
             if (protocolChanged && response.Code == ResponseCode.PartialContent)
                 throw new RemoteUpdateException("Expected full zone (because protocol changed), but received patch.");
-            
+
             var recommendedProtocol = GetRecommendedProtocolVersion(response);
             
             var version = DateTime.Parse(response.Headers.LastModified, null, DateTimeStyles.AssumeUniversal).ToUniversalTime();
@@ -220,6 +217,9 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
         private RemoteUpdateResult CreateResultViaFullZone(ClusterConfigProtocolVersion protocol, Response response, DateTime version, Uri replica, RemoteUpdateResult lastResult, ClusterConfigProtocolVersion? recommendedProtocol)
         {
+            if (!response.HasContent)
+                throw new RemoteUpdateException($"Received an empty {response.Code} response from server. Nothing to deserialize.");
+            
             var tree = new RemoteTree(protocol, response.Content.ToArray(), protocol.GetSerializer());
 
             LogReceivedNewZone(tree, version, replica, false, protocol);

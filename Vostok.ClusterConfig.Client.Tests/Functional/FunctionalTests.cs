@@ -629,6 +629,27 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             log.Received().Log(Arg.Is<LogEvent>(e => e.Level == LogLevel.Info && e.MessageTemplate == UpdatedTemplate && e.Properties["IsPatch"].ToString() == "False"));
         }
 
+        [Test]
+        public void Observables_should_reflect_empty_update()
+        {
+            if (protocol != ClusterConfigProtocolVersion.V2)
+                return;
+
+            using var _ = ShouldNotLog(LogLevel.Warn, LogLevel.Error, LogLevel.Fatal);
+
+            folder.CreateFile("local", b => b.Append("value-1"));
+
+            server.SetResponse(remoteTree1, version1);
+
+            VerifyResults(default, 1, remoteTree1.Merge(localTree1));
+            
+            server.SetEmptyPatchResponse(remoteTree1, version2);
+            
+            VerifyResults(default, 2, remoteTree1.Merge(localTree1));
+            
+            log.Received().Log(Arg.Is<LogEvent>(e => e.Level == LogLevel.Info && e.MessageTemplate == UpdatedTemplate && e.Properties["IsPatch"].ToString() == "True"));
+        }
+
         private void ModifySettings(Action<ClusterConfigClientSettings> modify)
         {
             modify(settings);
