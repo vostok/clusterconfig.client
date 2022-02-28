@@ -6,7 +6,7 @@
     <Configurations>Debug;Release</Configurations>
   </PropertyGroup>
   <PropertyGroup>
-    <VersionPrefix>0.2.16</VersionPrefix>
+    <VersionPrefix>0.2.17</VersionPrefix>
   </PropertyGroup>
   <PropertyGroup>
     <Title>Vostok.ClusterConfig.Client</Title>
