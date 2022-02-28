@@ -78,6 +78,14 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             SetPatchResponse(serialized, hash + (wrongHash ? "_WRONG_HASH" : ""), version);
         }
         
+        public void SetEmptyPatchResponse(ISettingsNode tree, DateTime version)
+        {
+            var serialized = SerializeTree(new Patcher().GetPatch(tree, tree), out _);
+            SerializeTree(tree, out var hash);
+            
+            SetPatchResponse(serialized, hash, version);
+        }
+        
         public void SetPatchResponse(byte[] patch, string hash, DateTime version)
         {
             response = Responses.PartialContent
