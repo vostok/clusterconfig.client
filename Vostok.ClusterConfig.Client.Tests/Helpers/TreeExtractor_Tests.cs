@@ -133,7 +133,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Helpers
 
                     protocol.GetSerializer().Serialize(remoteTree, writer);
 
-                    remote = new RemoteTree(protocol, writer.Buffer.Take(writer.Length).ToArray(), protocol.GetSerializer());
+                    remote = new RemoteTree(protocol, writer.Buffer.Take(writer.Length).ToArray(), protocol.GetSerializer(), "Desc");
                 }
 
                 state = new ClusterConfigClientState(localTree, remote, new RecyclingBoundedCache<ClusterConfigPath, ISettingsNode>(10), Int64.MaxValue);
