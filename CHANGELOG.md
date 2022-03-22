@@ -1,3 +1,7 @@
+## 0.2.17 (22-03-2022):
+
+Add trees descriptions into log messages
+
 ## 0.2.16 (28-02-2022):
 
 Change defult protocol to V2
