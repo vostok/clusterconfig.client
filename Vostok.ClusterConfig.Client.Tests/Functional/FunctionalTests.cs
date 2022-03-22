@@ -28,9 +28,9 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
     [TestFixture(ClusterConfigProtocolVersion.V2)]
     internal class FunctionalTests
     {
-        private const string UpdatedTemplate = "Received new version of zone '{Zone}' from {Replica}. Size = {Size}. Version = {Version}. Protocol = {Protocol}. Patch = {IsPatch}.";
-        private const string HashMismatchTemplate = "Detected hash mismatch: {ActualHash} != {ExpectedHash}. New version is {NewVersion}, is patch: {IsPatch}.";
-        private const string ApplyPatchErrorTemplate = "Can't apply patch {PatchVersion} to {OldVersion} (protocol {Protocol}).";
+        private const string UpdatedTemplate = "Received new version of zone '{Zone}' from {Replica}. Size = {Size}. Version = {Version}. Protocol = {Protocol}. Patch = {IsPatch}. {ResponsesDescriptions}.";
+        private const string HashMismatchTemplate = "Detected hash mismatch: {ActualHash} != {ExpectedHash}. New version is {NewVersion}, is patch: {IsPatch}. {ResponsesDescriptions}.";
+        private const string ApplyPatchErrorTemplate = "Can't apply patch {PatchVersion} to {OldVersion} (protocol {Protocol}). {ResponsesDescriptions}.";
         
         private readonly ClusterConfigProtocolVersion protocol;
         private TestServer server;
@@ -581,7 +581,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             
             server.SetPatchResponse(remoteTree1, remoteTree2, version2, true);
             
-            ((Action) (() => log.Received().Log(Arg.Is<LogEvent>(e => e.Level == LogLevel.Error && e.MessageTemplate == HashMismatchTemplate)))).ShouldPassIn(10.Seconds());
+            ((Action) (() => log.Received().Log(Arg.Is<LogEvent>(e => e.Level == LogLevel.Warn && e.MessageTemplate == HashMismatchTemplate)))).ShouldPassIn(10.Seconds());
             
             ((Action) (() => server.AsserRequest(r => r.Query.Should().Contain("forceFull=HashMismatch")))).ShouldPassIn(10.Seconds());
             

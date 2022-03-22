@@ -196,62 +196,63 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 throw new RemoteUpdateException("Expected full zone (because protocol changed), but received patch.");
 
             var recommendedProtocol = GetRecommendedProtocolVersion(response);
+            var responsesDescriptions = $"Responses descriptions: {{previous:{lastUpdateResult?.Tree?.Description}, current:{GetDescription(response)}}}";
             
             var version = DateTime.Parse(response.Headers.LastModified, null, DateTimeStyles.AssumeUniversal).ToUniversalTime();
 
             if (lastUpdateResult != null && version <= lastUpdateResult.Version)
             {
                 if (version < lastUpdateResult.Version)
-                    LogStaleVersion(version, lastUpdateResult.Version, protocol);
+                    LogStaleVersion(version, lastUpdateResult.Version, protocol, responsesDescriptions);
 
                 return new RemoteUpdateResult(false, lastUpdateResult.Tree, lastUpdateResult.Version, recommendedProtocol, lastUpdateResult.PatchingFailedReason);
             }
 
             return response.Code switch
             {
-                ResponseCode.Ok => CreateResultViaFullZone(protocol, response, version, replica, lastUpdateResult, recommendedProtocol),
-                ResponseCode.PartialContent => CreateResultViaPatch(protocol, response, version, replica, lastUpdateResult, recommendedProtocol),
+                ResponseCode.Ok => CreateResultViaFullZone(protocol, response, version, replica, lastUpdateResult, recommendedProtocol, responsesDescriptions),
+                ResponseCode.PartialContent => CreateResultViaPatch(protocol, response, version, replica, lastUpdateResult, recommendedProtocol, responsesDescriptions),
                 var code => throw new RemoteUpdateException($"Failed to update settings from server: unknown successful response code {code}")
             };
         }
 
-        private RemoteUpdateResult CreateResultViaFullZone(ClusterConfigProtocolVersion protocol, Response response, DateTime version, Uri replica, RemoteUpdateResult lastResult, ClusterConfigProtocolVersion? recommendedProtocol)
+        private RemoteUpdateResult CreateResultViaFullZone(ClusterConfigProtocolVersion protocol, Response response, DateTime version, Uri replica, RemoteUpdateResult lastResult, ClusterConfigProtocolVersion? recommendedProtocol, string responsesDescriptions)
         {
             if (!response.HasContent)
-                throw new RemoteUpdateException($"Received an empty {response.Code} response from server. Nothing to deserialize.");
+                throw new RemoteUpdateException($"Received an empty {response.Code} response from server. Nothing to deserialize. {responsesDescriptions}.");
             
-            var tree = new RemoteTree(protocol, response.Content.ToArray(), protocol.GetSerializer());
+            var tree = new RemoteTree(protocol, response.Content.ToArray(), protocol.GetSerializer(), GetDescription(response));
 
-            LogReceivedNewZone(tree, version, replica, false, protocol);
+            LogReceivedNewZone(tree, version, replica, false, protocol, responsesDescriptions);
 
             return new RemoteUpdateResult(true, tree, version, recommendedProtocol, null);
         }
 
-        private RemoteUpdateResult CreateResultViaPatch(ClusterConfigProtocolVersion protocol, Response response, DateTime version, Uri replica, RemoteUpdateResult lastResult, ClusterConfigProtocolVersion? recommendedProtocol)
+        private RemoteUpdateResult CreateResultViaPatch(ClusterConfigProtocolVersion protocol, Response response, DateTime version, Uri replica, RemoteUpdateResult lastResult, ClusterConfigProtocolVersion? recommendedProtocol, string responsesDescriptions)
         {
             if (protocol != ClusterConfigProtocolVersion.V2)
-                throw new RemoteUpdateException("Received 206 response from server, but it's not supported for current protocol.");
+                throw new RemoteUpdateException($"Received 206 response from server, but it's not supported for current protocol. {responsesDescriptions}.");
             
             if (lastResult?.Tree?.Serialized == null)
-                throw new RemoteUpdateException("Received 206 response from server, but nothing to patch.");
+                throw new RemoteUpdateException($"Received 206 response from server, but nothing to patch. {responsesDescriptions}.");
 
             if (protocol != lastResult.Tree.Protocol)
-                throw new RemoteUpdateException($"Received 206 response from server, but can't apply {protocol} patch to {lastResult.Tree.Protocol} tree.");
+                throw new RemoteUpdateException($"Received 206 response from server, but can't apply {protocol} patch to {lastResult.Tree.Protocol} tree. {responsesDescriptions}.");
             
-            if (!TryApplyPatch(protocol, response, lastResult, version, out var newZone))
+            if (!TryApplyPatch(protocol, response, lastResult, version, out var newZone, responsesDescriptions))
                 return CreatePatchingFailedResult(lastResult, recommendedProtocol, PatchingFailedReason.ApplyPatchFailed);
 
-            if (!EnsureHashValid(newZone, response, version, true))
+            if (!EnsureHashValid(newZone, response, version, true, responsesDescriptions))
                 return CreatePatchingFailedResult(lastResult, recommendedProtocol, PatchingFailedReason.HashMismatch);
 
-            var tree = new RemoteTree(protocol, newZone, protocol.GetSerializer());
+            var tree = new RemoteTree(protocol, newZone, protocol.GetSerializer(), GetDescription(response));
 
-            LogReceivedNewZone(tree, version, replica, true, protocol);
+            LogReceivedNewZone(tree, version, replica, true, protocol, responsesDescriptions);
 
             return new RemoteUpdateResult(true, tree, version, recommendedProtocol, null);
         }
 
-        private bool TryApplyPatch(ClusterConfigProtocolVersion protocol, Response response, RemoteUpdateResult old, DateTime version, out byte[] newZone)
+        private bool TryApplyPatch(ClusterConfigProtocolVersion protocol, Response response, RemoteUpdateResult old, DateTime version, out byte[] newZone, string responsesDescriptions)
         {
             try
             {
@@ -260,7 +261,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             }
             catch (Exception e)
             {
-                log.Error(e, "Can't apply patch {PatchVersion} to {OldVersion} (protocol {Protocol}).", version, old.Version, protocol);
+                log.Error(e, "Can't apply patch {PatchVersion} to {OldVersion} (protocol {Protocol}). {ResponsesDescriptions}.", version, old.Version, protocol, responsesDescriptions);
                 
                 newZone = null;
                 return false;
@@ -272,7 +273,9 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 ? Enum.TryParse<ClusterConfigProtocolVersion>(header, out var value) ? value : null
                 : null;
 
-        private bool EnsureHashValid(byte[] serialized, Response response, DateTime newVersion, bool isPatch)
+        private string GetDescription(Response response) => response.Headers[ClusterConfigHeaderNames.TreeDescription];
+
+        private bool EnsureHashValid(byte[] serialized, Response response, DateTime newVersion, bool isPatch, string responsesDescriptions)
         {
             var expectedHash = response.Headers[ClusterConfigHeaderNames.ZoneHash];
             if (expectedHash == null)
@@ -281,8 +284,14 @@ namespace Vostok.ClusterConfig.Client.Updaters
             var hash = serialized.GetSha256Str();
             if (hash == expectedHash)
                 return true;
-
-            log.Error("Detected hash mismatch: {ActualHash} != {ExpectedHash}. New version is {NewVersion}, is patch: {IsPatch}.", hash, expectedHash, newVersion, isPatch);
+            
+            log.Warn(
+                "Detected hash mismatch: {ActualHash} != {ExpectedHash}. New version is {NewVersion}, is patch: {IsPatch}. {ResponsesDescriptions}.",
+                hash,
+                expectedHash,
+                newVersion,
+                isPatch,
+                responsesDescriptions);
             
             return false;
         }
@@ -295,13 +304,18 @@ namespace Vostok.ClusterConfig.Client.Updaters
         private void LogZoneDoesNotExist()
             => log.Warn("Zone '{Zone}' not found. Returning empty remote settings.", zone);
 
-        private void LogStaleVersion(DateTime staleVersion, DateTime currentVersion, ClusterConfigProtocolVersion protocol)
-            => log.Warn("Received response for zone '{Zone}' with stale version '{StaleVersion}'. Current version = '{CurrentVersion}'. Protocol = {Protocol}. Will not update.",
-                zone, staleVersion, currentVersion, protocol.ToString());
+        private void LogStaleVersion(DateTime staleVersion, DateTime currentVersion, ClusterConfigProtocolVersion protocol, string responsesDescriptions) =>
+            log.Warn(
+                "Received response for zone '{Zone}' with stale version '{StaleVersion}'. Current version = '{CurrentVersion}'. Protocol = {Protocol}. {ResponsesDescriptions}. Will not update.",
+                zone, 
+                staleVersion,
+                currentVersion, 
+                protocol.ToString(),
+                responsesDescriptions);
 
-        private void LogReceivedNewZone(RemoteTree tree, DateTime version, Uri replica, bool patch, ClusterConfigProtocolVersion protocol)
-            => log.Info("Received new version of zone '{Zone}' from {Replica}. Size = {Size}. Version = {Version}. Protocol = {Protocol}. Patch = {IsPatch}.", 
-                zone, replica?.Authority, tree.Size, version.ToString("R"), protocol.ToString(), patch);
+        private void LogReceivedNewZone(RemoteTree tree, DateTime version, Uri replica, bool patch, ClusterConfigProtocolVersion protocol, string responsesDescriptions)
+            => log.Info("Received new version of zone '{Zone}' from {Replica}. Size = {Size}. Version = {Version}. Protocol = {Protocol}. Patch = {IsPatch}. {ResponsesDescriptions}.", 
+                zone, replica?.Authority, tree.Size, version.ToString("R"), protocol.ToString(), patch, responsesDescriptions);
 
         #endregion
 

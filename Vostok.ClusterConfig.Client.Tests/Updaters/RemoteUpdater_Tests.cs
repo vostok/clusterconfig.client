@@ -53,8 +53,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
 
             cancellation = new CancellationTokenSource();
 
-            tree1 = new RemoteTree(protocol, Guid.NewGuid().ToByteArray(), protocol.GetSerializer());
-            tree2 = new RemoteTree(protocol, Guid.NewGuid().ToByteArray(), protocol.GetSerializer());
+            tree1 = new RemoteTree(protocol, Guid.NewGuid().ToByteArray(), protocol.GetSerializer(), "T1 Desc");
+            tree2 = new RemoteTree(protocol, Guid.NewGuid().ToByteArray(), protocol.GetSerializer(), "T2 Desc");
 
             version1 = DateTime.UtcNow;
             version1 = new DateTime(version1.Year, version1.Month, version1.Day, version1.Hour, version1.Minute, version1.Second, 0, version1.Kind);

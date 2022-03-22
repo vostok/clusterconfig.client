@@ -11,10 +11,11 @@ namespace Vostok.ClusterConfig.Client.Helpers
     {
         private readonly ITreeSerializer serializer;
 
-        public RemoteTree(ClusterConfigProtocolVersion protocol, byte[] serialized, ITreeSerializer serializer)
+        public RemoteTree(ClusterConfigProtocolVersion protocol, byte[] serialized, ITreeSerializer serializer, [CanBeNull] string description)
         {
             Protocol = protocol;
             Serialized = serialized;
+            Description = description;
 
             this.serializer = serializer;
         }
@@ -24,6 +25,9 @@ namespace Vostok.ClusterConfig.Client.Helpers
         public ClusterConfigProtocolVersion Protocol { get; }
         
         public byte[] Serialized { get; }
+        
+        [CanBeNull]
+        public string Description { get; }
 
         [CanBeNull]
         public ISettingsNode GetSettings(ClusterConfigPath path)
