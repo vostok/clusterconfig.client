@@ -1,0 +1,79 @@
+const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.CacheCapacity = 75 -> int
+const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.ConfigurationFile = "clusterconfig" -> string
+const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.Dns = "clusterconfig" -> string
+const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.LocalFolder = "settings" -> string
+const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.MaximumFileSize = 1048576 -> int
+const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.Port = 9000 -> int
+const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.Zone = "default" -> string
+override Vostok.ClusterConfig.Core.Patching.DeleteNode.Equals(object obj) -> bool
+override Vostok.ClusterConfig.Core.Patching.DeleteNode.GetHashCode() -> int
+override Vostok.ClusterConfig.Core.Patching.DeleteNode.ToString() -> string
+static readonly Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.Cluster -> Vostok.Clusterclient.Core.Topology.IClusterProvider
+static readonly Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.RequestTimeout -> System.TimeSpan
+static readonly Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.UpdatePeriod -> System.TimeSpan
+static Vostok.ClusterConfig.Client.ClusterConfigClient.Default.get -> Vostok.ClusterConfig.Client.ClusterConfigClient
+static Vostok.ClusterConfig.Client.ClusterConfigClient.TrySetDefaultClient(Vostok.ClusterConfig.Client.ClusterConfigClient clusterConfigClient) -> bool
+static Vostok.ClusterConfig.Client.DefaultSettingsProvider.Settings.get -> Vostok.ClusterConfig.Client.ClusterConfigClientSettings
+Vostok.ClusterConfig.Client.ClusterConfigClient
+Vostok.ClusterConfig.Client.ClusterConfigClient.ClusterConfigClient() -> void
+Vostok.ClusterConfig.Client.ClusterConfigClient.ClusterConfigClient(Vostok.ClusterConfig.Client.ClusterConfigClientSettings settings) -> void
+Vostok.ClusterConfig.Client.ClusterConfigClient.Dispose() -> void
+Vostok.ClusterConfig.Client.ClusterConfigClient.Get(Vostok.ClusterConfig.Client.Abstractions.ClusterConfigPath prefix) -> Vostok.Configuration.Abstractions.SettingsTree.ISettingsNode
+Vostok.ClusterConfig.Client.ClusterConfigClient.GetAsync(Vostok.ClusterConfig.Client.Abstractions.ClusterConfigPath prefix) -> System.Threading.Tasks.Task<Vostok.Configuration.Abstractions.SettingsTree.ISettingsNode>
+Vostok.ClusterConfig.Client.ClusterConfigClient.GetWithVersion(Vostok.ClusterConfig.Client.Abstractions.ClusterConfigPath prefix) -> (Vostok.Configuration.Abstractions.SettingsTree.ISettingsNode settings, long version)
+Vostok.ClusterConfig.Client.ClusterConfigClient.GetWithVersionAsync(Vostok.ClusterConfig.Client.Abstractions.ClusterConfigPath prefix) -> System.Threading.Tasks.Task<(Vostok.Configuration.Abstractions.SettingsTree.ISettingsNode settings, long version)>
+Vostok.ClusterConfig.Client.ClusterConfigClient.HasInitialized.get -> bool
+Vostok.ClusterConfig.Client.ClusterConfigClient.Observe(Vostok.ClusterConfig.Client.Abstractions.ClusterConfigPath prefix) -> System.IObservable<Vostok.Configuration.Abstractions.SettingsTree.ISettingsNode>
+Vostok.ClusterConfig.Client.ClusterConfigClient.ObserveWithVersions(Vostok.ClusterConfig.Client.Abstractions.ClusterConfigPath prefix) -> System.IObservable<(Vostok.Configuration.Abstractions.SettingsTree.ISettingsNode settings, long version)>
+Vostok.ClusterConfig.Client.ClusterConfigClient.Version.get -> long
+Vostok.ClusterConfig.Client.ClusterConfigClient.Zone.get -> string
+Vostok.ClusterConfig.Client.ClusterConfigClientDefaults
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.AdditionalSetup.get -> Vostok.Clusterclient.Core.ClusterClientSetup
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.AdditionalSetup.set -> void
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.AssumeClusterConfigDeployed.get -> bool
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.AssumeClusterConfigDeployed.set -> void
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.CacheCapacity.get -> int
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.CacheCapacity.set -> void
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.Cluster.get -> Vostok.Clusterclient.Core.Topology.IClusterProvider
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.Cluster.set -> void
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.ClusterConfigClientSettings() -> void
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.EnableClusterSettings.get -> bool
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.EnableClusterSettings.set -> void
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.EnableLocalSettings.get -> bool
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.EnableLocalSettings.set -> void
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.ForcedProtocolVersion.get -> Vostok.ClusterConfig.Client.ClusterConfigProtocolVersion?
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.ForcedProtocolVersion.set -> void
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.LocalFolder.get -> string
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.LocalFolder.set -> void
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.Log.get -> Vostok.Logging.Abstractions.ILog
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.Log.set -> void
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.MaximumFileSize.get -> int
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.MaximumFileSize.set -> void
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.MergeOptions.get -> Vostok.Configuration.Abstractions.Merging.SettingsMergeOptions
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.MergeOptions.set -> void
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.RequestTimeout.get -> System.TimeSpan
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.RequestTimeout.set -> void
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.UpdatePeriod.get -> System.TimeSpan
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.UpdatePeriod.set -> void
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.Zone.get -> string
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.Zone.set -> void
+Vostok.ClusterConfig.Client.ClusterConfigProtocolVersion
+Vostok.ClusterConfig.Client.ClusterConfigProtocolVersion.V1 = 1 -> Vostok.ClusterConfig.Client.ClusterConfigProtocolVersion
+Vostok.ClusterConfig.Client.ClusterConfigProtocolVersion.V2 = 2 -> Vostok.ClusterConfig.Client.ClusterConfigProtocolVersion
+Vostok.ClusterConfig.Client.DefaultSettingsProvider
+Vostok.ClusterConfig.Client.Helpers.DnsClusterProvider
+Vostok.ClusterConfig.Client.Helpers.DnsClusterProvider.Dns.get -> string
+Vostok.ClusterConfig.Client.Helpers.DnsClusterProvider.DnsClusterProvider(string dns, int port) -> void
+Vostok.ClusterConfig.Client.Helpers.DnsClusterProvider.GetCluster() -> System.Collections.Generic.IList<System.Uri>
+Vostok.ClusterConfig.Client.Helpers.DnsClusterProvider.Port.get -> int
+Vostok.ClusterConfig.Core.Patching.DeleteNode
+Vostok.ClusterConfig.Core.Patching.DeleteNode.DeleteNode(string name = null) -> void
+Vostok.ClusterConfig.Core.Patching.DeleteNode.Equals(Vostok.ClusterConfig.Core.Patching.DeleteNode other) -> bool
+Vostok.ClusterConfig.Core.Patching.DeleteNode.Merge(Vostok.Configuration.Abstractions.SettingsTree.ISettingsNode other, Vostok.Configuration.Abstractions.Merging.SettingsMergeOptions options = null) -> Vostok.Configuration.Abstractions.SettingsTree.ISettingsNode
+Vostok.ClusterConfig.Core.Patching.DeleteNode.Name.get -> string
+Vostok.ClusterConfig.Core.Patching.DeleteNode.Value.get -> string
+Vostok.ClusterConfig.Core.Patching.Patcher
+Vostok.ClusterConfig.Core.Patching.Patcher.ApplyPatch(Vostok.Configuration.Abstractions.SettingsTree.ISettingsNode oldSettings, Vostok.Configuration.Abstractions.SettingsTree.ISettingsNode patch) -> Vostok.Configuration.Abstractions.SettingsTree.ISettingsNode
+Vostok.ClusterConfig.Core.Patching.Patcher.GetPatch(Vostok.Configuration.Abstractions.SettingsTree.ISettingsNode oldSettings, Vostok.Configuration.Abstractions.SettingsTree.ISettingsNode newSettings) -> Vostok.Configuration.Abstractions.SettingsTree.ISettingsNode
+Vostok.ClusterConfig.Core.Patching.Patcher.Patcher() -> void
