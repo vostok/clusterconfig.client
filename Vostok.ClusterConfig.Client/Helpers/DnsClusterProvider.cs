@@ -50,8 +50,7 @@ namespace Vostok.ClusterConfig.Client.Helpers
                     return currentCache;
                 }
 
-                if (error.SocketErrorCode == SocketError.HostNotFound ||
-                    error.SocketErrorCode == SocketError.NoData)
+                if (error.SocketErrorCode is SocketError.HostNotFound or SocketError.NoData or SocketError.TryAgain)
                 {
                     return EmptyCluster;
                 }
