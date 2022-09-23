@@ -1,3 +1,7 @@
+## 0.2.18 (23-09-2022):
+
+Fix: treat `TryAgain` SocketError code as empty cluster.
+
 ## 0.2.17 (22-03-2022):
 
 Add trees descriptions into log messages
