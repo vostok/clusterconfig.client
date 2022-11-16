@@ -69,7 +69,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             };
         }
 
-        private static ClusterClient CreateClient(IClusterProvider cluster, ClusterClientSetup setup, ILog log, TimeSpan timeout)
+        internal static ClusterClient CreateClient(IClusterProvider cluster, ClusterClientSetup setup, ILog log, TimeSpan timeout)
         {
             return new ClusterClient(
                 log.WithMinimumLevel(LogLevel.Warn),
