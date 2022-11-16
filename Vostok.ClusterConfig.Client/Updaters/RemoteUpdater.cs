@@ -45,7 +45,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
         {
         }
 
-        public async Task<RemoteUpdateResult> UpdateAsync(ClusterConfigProtocolVersion protocol, RemoteUpdateResult lastResult, CancellationToken cancellationToken)
+        public async Task<RemoteUpdateResult> UpdateAsync(ClusterConfigProtocolVersion protocol, [CanBeNull] RemoteUpdateResult lastResult, CancellationToken cancellationToken)
         {
             if (!enabled)
                 return CreateEmptyResult(lastResult);
