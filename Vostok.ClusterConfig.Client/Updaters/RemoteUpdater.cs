@@ -17,6 +17,7 @@ using Vostok.ClusterConfig.Client.Exceptions;
 using Vostok.ClusterConfig.Client.Helpers;
 using Vostok.ClusterConfig.Core.Http;
 using Vostok.ClusterConfig.Core.Utils;
+using Vostok.Commons.Collections;
 using Vostok.Logging.Abstractions;
 
 namespace Vostok.ClusterConfig.Client.Updaters
@@ -27,21 +28,37 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
         private readonly bool enabled;
         private readonly IClusterClient client;
+        private readonly RecyclingBoundedCache<string, string> interningCache;
         private readonly ILog log;
         private readonly string zone;
         private readonly bool assumeClusterConfigDeployed;
 
-        public RemoteUpdater(bool enabled, IClusterClient client, ILog log, string zone, bool assumeClusterConfigDeployed = false)
+        public RemoteUpdater(
+            bool enabled,
+            IClusterClient client,
+            RecyclingBoundedCache<string, string> interningCache,
+            ILog log, 
+            string zone, 
+            bool assumeClusterConfigDeployed = false)
         {
             this.enabled = enabled;
             this.client = client;
+            this.interningCache = interningCache;
             this.log = log;
             this.zone = zone;
             this.assumeClusterConfigDeployed = assumeClusterConfigDeployed;
         }
 
-        public RemoteUpdater(bool enabled, IClusterProvider cluster, ClusterClientSetup setup, ILog log, string zone, TimeSpan timeout, bool assumeClusterConfigDeployed = false)
-            : this(enabled, enabled ? CreateClient(cluster, setup, log, timeout) : null, log, zone, assumeClusterConfigDeployed)
+        public RemoteUpdater(
+            bool enabled,
+            IClusterProvider cluster,
+            ClusterClientSetup setup,
+            RecyclingBoundedCache<string, string> interningCache,
+            ILog log,
+            string zone,
+            TimeSpan timeout,
+            bool assumeClusterConfigDeployed = false)
+            : this(enabled, enabled ? CreateClient(cluster, setup, log, timeout) : null, interningCache, log, zone, assumeClusterConfigDeployed)
         {
         }
 
@@ -221,7 +238,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             if (!response.HasContent)
                 throw new RemoteUpdateException($"Received an empty {response.Code} response from server. Nothing to deserialize. {responsesDescriptions}.");
             
-            var tree = new RemoteTree(protocol, response.Content.ToArray(), protocol.GetSerializer(), GetDescription(response));
+            var tree = new RemoteTree(protocol, response.Content.ToArray(), protocol.GetSerializer(interningCache), GetDescription(response));
 
             LogReceivedNewZone(tree, version, replica, false, protocol, responsesDescriptions);
 
@@ -245,7 +262,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             if (!EnsureHashValid(newZone, response, version, true, responsesDescriptions))
                 return CreatePatchingFailedResult(lastResult, recommendedProtocol, PatchingFailedReason.HashMismatch);
 
-            var tree = new RemoteTree(protocol, newZone, protocol.GetSerializer(), GetDescription(response));
+            var tree = new RemoteTree(protocol, newZone, protocol.GetSerializer(interningCache), GetDescription(response));
 
             LogReceivedNewZone(tree, version, replica, true, protocol, responsesDescriptions);
 
@@ -256,7 +273,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
         {
             try
             {
-                newZone = protocol.GetPatcher().ApplyPatch(old.Tree!.Serialized, response.Content.ToArray());
+                newZone = protocol.GetPatcher(interningCache).ApplyPatch(old.Tree!.Serialized, response.Content.ToArray());
                 return true;
             }
             catch (Exception e)

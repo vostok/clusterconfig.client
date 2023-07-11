@@ -30,6 +30,7 @@ namespace Vostok.ClusterConfig.Client
         private readonly ClusterConfigClientSettings settings;
         private readonly CancellationTokenSource cancellationSource;
         private readonly AtomicInt clientState;
+        private readonly RecyclingBoundedCache<string,string> internedValuesCache;
         private readonly ILog log;
 
         private readonly object observablePropagationLock;
@@ -51,6 +52,7 @@ namespace Vostok.ClusterConfig.Client
             clientState = new AtomicInt(State_NotStarted);
             cancellationSource = new CancellationTokenSource();
             observablePropagationLock = new object();
+            internedValuesCache = new RecyclingBoundedCache<string, string>(settings.InternedValuesCacheCapacity);
         }
 
         /// <summary>
@@ -271,6 +273,7 @@ namespace Vostok.ClusterConfig.Client
                 settings.EnableClusterSettings,
                 settings.Cluster,
                 settings.AdditionalSetup,
+                internedValuesCache,
                 log,
                 settings.Zone,
                 settings.RequestTimeout,

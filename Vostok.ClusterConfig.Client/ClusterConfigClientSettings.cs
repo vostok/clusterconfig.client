@@ -82,6 +82,11 @@ namespace Vostok.ClusterConfig.Client
         public int CacheCapacity { get; set; } = ClusterConfigClientDefaults.CacheCapacity;
 
         /// <summary>
+        /// Gets or sets the capacity of the internal cache storing interned string keys and values from subtrees corresponding to requested prefixes.
+        /// </summary>
+        public int InternedValuesCacheCapacity { get; set; } = ClusterConfigClientDefaults.InternedValuesCacheCapacity;
+
+        /// <summary>
         /// <para>Gets or sets the maximum allowed file size. Local files larger than this will be ignored.</para>
         /// <para>Only relevant when <see cref="EnableLocalSettings"/> is set to <c>true</c>.</para>
         /// </summary>
