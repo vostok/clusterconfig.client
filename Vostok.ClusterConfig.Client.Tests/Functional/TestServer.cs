@@ -10,6 +10,7 @@ using Vostok.ClusterConfig.Core.Http;
 using Vostok.ClusterConfig.Core.Patching;
 using Vostok.ClusterConfig.Core.Utils;
 using Vostok.Commons.Binary;
+using Vostok.Commons.Collections;
 using Vostok.Commons.Helpers.Network;
 using Vostok.Configuration.Abstractions.SettingsTree;
 
@@ -133,7 +134,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         {
             var writer = new BinaryBufferWriter(64);
 
-            protocol.GetSerializer().Serialize(tree, writer);
+            protocol.GetSerializer(new RecyclingBoundedCache<string, string>(4)).Serialize(tree, writer);
 
             hash = writer.Buffer.GetSha256Str(0, writer.Length);
             
