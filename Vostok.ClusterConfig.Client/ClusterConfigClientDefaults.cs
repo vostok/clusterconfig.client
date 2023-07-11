@@ -23,7 +23,7 @@ namespace Vostok.ClusterConfig.Client
 
         public const int CacheCapacity = 75;
 
-        public const int InternedValuesCacheCapacity = 300;
+        public const int InternedValuesCacheCapacity = 1000;
 
         public const int MaximumFileSize = 1024 * 1024;
 
