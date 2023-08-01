@@ -83,6 +83,7 @@ namespace Vostok.ClusterConfig.Client
 
         /// <summary>
         /// Gets or sets the capacity of the internal cache storing interned string keys and values from subtrees corresponding to requested prefixes.
+        /// If the value is less or equal to zero, no interning will be used. The default value is 0.
         /// </summary>
         public int InternedValuesCacheCapacity { get; set; } = ClusterConfigClientDefaults.InternedValuesCacheCapacity;
 
