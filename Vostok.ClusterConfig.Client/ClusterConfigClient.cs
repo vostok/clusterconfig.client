@@ -52,7 +52,7 @@ namespace Vostok.ClusterConfig.Client
             clientState = new AtomicInt(State_NotStarted);
             cancellationSource = new CancellationTokenSource();
             observablePropagationLock = new object();
-            internedValuesCache = new RecyclingBoundedCache<string, string>(settings.InternedValuesCacheCapacity);
+            internedValuesCache = settings.InternedValuesCacheCapacity > 0 ? new RecyclingBoundedCache<string, string>(settings.InternedValuesCacheCapacity) : null;
         }
 
         /// <summary>
