@@ -23,6 +23,8 @@ namespace Vostok.ClusterConfig.Client
 
         public const int CacheCapacity = 75;
 
+        public const int InternedValuesCacheCapacity = 0;
+
         public const int MaximumFileSize = 1024 * 1024;
 
         public static readonly TimeSpan UpdatePeriod = TimeSpan.FromSeconds(10);
