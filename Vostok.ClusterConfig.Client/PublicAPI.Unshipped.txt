@@ -1,0 +1,3 @@
+const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.InternedValuesCacheCapacity = 0 -> int
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.InternedValuesCacheCapacity.get -> int
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.InternedValuesCacheCapacity.set -> void

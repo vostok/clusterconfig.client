@@ -130,10 +130,10 @@ namespace Vostok.ClusterConfig.Client.Tests.Helpers
                 else
                 {
                     var writer = new BinaryBufferWriter(64);
+                    var cache = new RecyclingBoundedCache<string, string>(4);
+                    protocol.GetSerializer(cache).Serialize(remoteTree, writer);
 
-                    protocol.GetSerializer().Serialize(remoteTree, writer);
-
-                    remote = new RemoteTree(protocol, writer.Buffer.Take(writer.Length).ToArray(), protocol.GetSerializer(), "Desc");
+                    remote = new RemoteTree(protocol, writer.Buffer.Take(writer.Length).ToArray(), protocol.GetSerializer(cache), "Desc");
                 }
 
                 state = new ClusterConfigClientState(localTree, remote, new RecyclingBoundedCache<ClusterConfigPath, ISettingsNode>(10), Int64.MaxValue);

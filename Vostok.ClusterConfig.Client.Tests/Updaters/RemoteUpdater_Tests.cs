@@ -13,6 +13,7 @@ using Vostok.ClusterConfig.Client.Exceptions;
 using Vostok.ClusterConfig.Client.Helpers;
 using Vostok.ClusterConfig.Client.Updaters;
 using Vostok.ClusterConfig.Core.Serialization;
+using Vostok.Commons.Collections;
 using Vostok.Logging.Abstractions;
 using Vostok.Logging.Console;
 
@@ -48,13 +49,14 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
 
             client = Substitute.For<IClusterClient>();
 
-            enabledUpdater = new RemoteUpdater(true, client, log, "default");
-            disabledUpdater = new RemoteUpdater(false, null, log, "default");
+            enabledUpdater = new RemoteUpdater(true, client, new RecyclingBoundedCache<string, string>(4), log, "default");
+            disabledUpdater = new RemoteUpdater(false, null, new RecyclingBoundedCache<string, string>(4), log, "default");
 
             cancellation = new CancellationTokenSource();
 
-            tree1 = new RemoteTree(protocol, Guid.NewGuid().ToByteArray(), protocol.GetSerializer(), "T1 Desc");
-            tree2 = new RemoteTree(protocol, Guid.NewGuid().ToByteArray(), protocol.GetSerializer(), "T2 Desc");
+            var cache = new RecyclingBoundedCache<string, string>(4);
+            tree1 = new RemoteTree(protocol, Guid.NewGuid().ToByteArray(), protocol.GetSerializer(cache), "T1 Desc");
+            tree2 = new RemoteTree(protocol, Guid.NewGuid().ToByteArray(), protocol.GetSerializer(cache), "T2 Desc");
 
             version1 = DateTime.UtcNow;
             version1 = new DateTime(version1.Year, version1.Month, version1.Day, version1.Hour, version1.Minute, version1.Second, 0, version1.Kind);
