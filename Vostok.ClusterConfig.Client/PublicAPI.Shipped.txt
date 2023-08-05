@@ -1,6 +1,7 @@
-const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.CacheCapacity = 75 -> int
+﻿const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.CacheCapacity = 75 -> int
 const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.ConfigurationFile = "clusterconfig" -> string
 const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.Dns = "clusterconfig" -> string
+const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.InternedValuesCacheCapacity = 0 -> int
 const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.LocalFolder = "settings" -> string
 const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.MaximumFileSize = 1048576 -> int
 const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.Port = 9000 -> int
@@ -44,6 +45,8 @@ Vostok.ClusterConfig.Client.ClusterConfigClientSettings.EnableLocalSettings.get 
 Vostok.ClusterConfig.Client.ClusterConfigClientSettings.EnableLocalSettings.set -> void
 Vostok.ClusterConfig.Client.ClusterConfigClientSettings.ForcedProtocolVersion.get -> Vostok.ClusterConfig.Client.ClusterConfigProtocolVersion?
 Vostok.ClusterConfig.Client.ClusterConfigClientSettings.ForcedProtocolVersion.set -> void
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.InternedValuesCacheCapacity.get -> int
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.InternedValuesCacheCapacity.set -> void
 Vostok.ClusterConfig.Client.ClusterConfigClientSettings.LocalFolder.get -> string
 Vostok.ClusterConfig.Client.ClusterConfigClientSettings.LocalFolder.set -> void
 Vostok.ClusterConfig.Client.ClusterConfigClientSettings.Log.get -> Vostok.Logging.Abstractions.ILog
