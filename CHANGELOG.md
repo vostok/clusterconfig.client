@@ -1,3 +1,7 @@
+## 0.2.19 (05-08-2023):
+
+Add options to intern string values after deserialization
+
 ## 0.2.18 (23-09-2022):
 
 Fix: treat `TryAgain` SocketError code as empty cluster.
