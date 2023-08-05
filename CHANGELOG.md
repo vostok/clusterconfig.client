@@ -1,4 +1,4 @@
-## 0.2.19 (05-08-2023):
+## 0.2.20 (05-08-2023):
 
 Add options to intern string values after deserialization
 
