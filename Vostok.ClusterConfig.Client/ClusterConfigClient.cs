@@ -32,11 +32,13 @@ namespace Vostok.ClusterConfig.Client
         private readonly AtomicInt clientState;
         private readonly RecyclingBoundedCache<string,string> internedValuesCache;
         private readonly ILog log;
+        private readonly SubtreesObservingState subtreesObservingState;
 
         private readonly object observablePropagationLock;
 
         private volatile TaskCompletionSource<ClusterConfigClientState> stateSource;
         private volatile CachingObservable<ClusterConfigClientState> stateObservable;
+        private volatile CancellationTokenSource immediatelyUpdateTokenSource;
 
         /// <summary>
         /// Creates a new instance of <see cref="ClusterConfigClient"/> with given <paramref name="settings"/> merged with default settings from <see cref="DefaultSettingsProvider"/> (non-default user settings take priority).
@@ -53,6 +55,7 @@ namespace Vostok.ClusterConfig.Client
             cancellationSource = new CancellationTokenSource();
             observablePropagationLock = new object();
             internedValuesCache = settings.InternedValuesCacheCapacity > 0 ? new RecyclingBoundedCache<string, string>(settings.InternedValuesCacheCapacity) : null;
+            immediatelyUpdateTokenSource = new CancellationTokenSource();
         }
 
         /// <summary>
@@ -92,29 +95,29 @@ namespace Vostok.ClusterConfig.Client
 
         /// <inheritdoc />
         public ISettingsNode Get(ClusterConfigPath prefix)
-            => GetSettings(ObtainState(), prefix).settings;
+            => GetSettings(ObtainState(prefix), prefix).settings;
 
         /// <inheritdoc />
         public (ISettingsNode settings, long version) GetWithVersion(ClusterConfigPath prefix)
-            => GetSettings(ObtainState(), prefix);
+            => GetSettings(ObtainState(prefix), prefix);
 
         /// <inheritdoc />
         public async Task<ISettingsNode> GetAsync(ClusterConfigPath prefix)
-            => GetSettings(await ObtainStateAsync().ConfigureAwait(false), prefix).settings;
+            => GetSettings(await ObtainStateAsync(prefix).ConfigureAwait(false), prefix).settings;
 
         /// <inheritdoc />
         public async Task<(ISettingsNode settings, long version)> GetWithVersionAsync(ClusterConfigPath prefix)
-            => GetSettings(await ObtainStateAsync().ConfigureAwait(false), prefix);
+            => GetSettings(await ObtainStateAsync(prefix).ConfigureAwait(false), prefix);
 
         /// <inheritdoc />
         public IObservable<ISettingsNode> Observe(ClusterConfigPath prefix)
-            => ObtainStateObservable()
+            => ObtainStateObservable(prefix)
                 .Select(state => GetSettings(state, prefix).settings)
                 .DistinctUntilChanged();
 
         /// <inheritdoc />
         public IObservable<(ISettingsNode settings, long version)> ObserveWithVersions(ClusterConfigPath prefix)
-            => ObtainStateObservable()
+            => ObtainStateObservable(prefix)
                 .Select(state => GetSettings(state, prefix))
                 .DistinctUntilChanged(tuple => tuple.settings);
 
@@ -141,26 +144,44 @@ namespace Vostok.ClusterConfig.Client
         }
 
         [NotNull]
-        private ClusterConfigClientState ObtainState()
+        private ClusterConfigClientState ObtainState(ClusterConfigPath clusterConfigPath)
         {
             InitiatePeriodicUpdates();
 
+            if (subtreesObservingState.TryAddSubtree(clusterConfigPath, out var tcs))
+            {
+                immediatelyUpdateTokenSource.Cancel();
+                tcs.Task.GetAwaiter().GetResult();
+            }
+            
             return stateSource.Task.GetAwaiter().GetResult();
         }
 
         [NotNull]
-        private Task<ClusterConfigClientState> ObtainStateAsync()
+        private async Task<ClusterConfigClientState> ObtainStateAsync(ClusterConfigPath clusterConfigPath)
         {
             InitiatePeriodicUpdates();
 
-            return stateSource.Task;
+            if (subtreesObservingState.TryAddSubtree(clusterConfigPath, out var tcs))
+            {
+                immediatelyUpdateTokenSource.Cancel();
+                await tcs.Task;
+            }
+
+            return await stateSource.Task;
         }
 
         [NotNull]
-        private IObservable<ClusterConfigClientState> ObtainStateObservable()
+        private IObservable<ClusterConfigClientState> ObtainStateObservable(ClusterConfigPath clusterConfigPath)
         {
             InitiatePeriodicUpdates();
 
+            if (subtreesObservingState.TryAddSubtree(clusterConfigPath, out var tcs))
+            {
+                immediatelyUpdateTokenSource.Cancel();
+                //TODO комментарий, почему не надо ждать, как в Get
+            }
+            
             return stateObservable;
         }
 
@@ -206,6 +227,10 @@ namespace Vostok.ClusterConfig.Client
 
             while (!cancellationToken.IsCancellationRequested)
             {
+                //(deniaa): Главное возвести его до того, как сходим в сервер.
+                //(deniaa): Если его возведут до похода в сервер, то в худшем случае мы просто лишний раз (ещё раз) сходим в сервер.
+                //(deniaa): Если его возведут до этой строчки и мы его перетрём - ничего страшного, ведь мы и так пошли в сервер, т.е. делаем то, что от нас хотели.
+                immediatelyUpdateTokenSource = new CancellationTokenSource();
                 var currentState = GetCurrentState();
 
                 var budget = TimeBudget.StartNew(settings.UpdatePeriod);
@@ -213,7 +238,8 @@ namespace Vostok.ClusterConfig.Client
                 try
                 {
                     var localUpdateResult = localUpdater.Update(lastLocalResult);
-                    var remoteUpdateResult = await remoteUpdater.UpdateAsync(protocol, lastRemoteResult, cancellationToken).ConfigureAwait(false);
+                    var observingSubtrees = subtreesObservingState.ObservingSubtrees;
+                    var remoteUpdateResult = await remoteUpdater.UpdateAsync(observingSubtrees, protocol, lastRemoteResult, cancellationToken).ConfigureAwait(false);
 
                     if (remoteUpdateResult.RecommendedProtocol is {} recommendedProtocol && settings.ForcedProtocolVersion == null)
                     {
@@ -224,8 +250,11 @@ namespace Vostok.ClusterConfig.Client
                         }
                     }
 
-                    if (currentState == null || localUpdateResult.Changed || remoteUpdateResult.Changed)
+                    if (currentState == null || localUpdateResult.Changed || remoteUpdateResult.Changed || remoteUpdateResult.ChangedSubtrees)
                         PropagateNewState(CreateNewState(currentState, localUpdateResult, remoteUpdateResult), cancellationToken);
+                    if (observingSubtrees != null)
+                        foreach (var observingSubtree in observingSubtrees)
+                            observingSubtree.CompletionSource.TrySetResult(true);
 
                     lastLocalResult = localUpdateResult;
                     lastRemoteResult = remoteUpdateResult;
@@ -241,7 +270,8 @@ namespace Vostok.ClusterConfig.Client
                         PropagateError(new ClusterConfigClientException("Failure in initial settings update.", error), false);
                 }
 
-                await Task.Delay(budget.Remaining, cancellationToken).ConfigureAwait(false);
+                var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, immediatelyUpdateTokenSource.Token);
+                await Task.Delay(budget.Remaining, linkedSource.Token).ConfigureAwait(false);
             }
         }
 
@@ -271,6 +301,7 @@ namespace Vostok.ClusterConfig.Client
         private RemoteUpdater CreateRemoteUpdater()
             => new RemoteUpdater(
                 settings.EnableClusterSettings,
+                subtreesObservingState,
                 settings.Cluster,
                 settings.AdditionalSetup,
                 internedValuesCache,
@@ -291,6 +322,7 @@ namespace Vostok.ClusterConfig.Client
         {
             var newLocalTree = localUpdateResult.Changed ? localUpdateResult.Tree : oldState?.LocalTree;
             var newRemoteTree = remoteUpdateResult.Changed ? remoteUpdateResult.Tree : oldState?.RemoteTree;
+            var newRemoteSubtrees = remoteUpdateResult.ChangedSubtrees ? remoteUpdateResult.Subtrees : oldState?.RemoteSubtrees;
             var newCaches = new RecyclingBoundedCache<ClusterConfigPath, ISettingsNode>(settings.CacheCapacity);
             var newVersion = (oldState?.Version ?? 0L) + 1;
             
@@ -299,7 +331,7 @@ namespace Vostok.ClusterConfig.Client
                     ? remoteUpdateResult.Version.Ticks
                     : newVersion;
 
-            return new ClusterConfigClientState(newLocalTree, newRemoteTree, newCaches, newVersion);
+            return new ClusterConfigClientState(newLocalTree, newRemoteTree, newRemoteSubtrees, newCaches, newVersion);
         }
 
         private void PropagateNewState([NotNull] ClusterConfigClientState state, CancellationToken cancellationToken)

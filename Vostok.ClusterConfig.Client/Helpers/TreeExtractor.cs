@@ -39,10 +39,18 @@ namespace Vostok.ClusterConfig.Client.Helpers
                     return tree.ScopeTo(path.Segments.Skip(prefix.Segments.Count()));
             }
 
-            var remoteSettings = state.RemoteTree?.GetSettings(path);
+            var remoteSettings = GetRemoteSettings(state, path);
             var localSettings = state.LocalTree?.ScopeTo(path.Segments);
 
             return SettingsNodeMerger.Merge(remoteSettings, localSettings, mergeOptions);
+        }
+
+        private static ISettingsNode GetRemoteSettings(ClusterConfigClientState state, ClusterConfigPath path)
+        {
+            if (state.RemoteSubtrees != null && state.RemoteSubtrees.TryGetSettings(path, out var settings))
+                return settings;
+
+            return state.RemoteTree?.GetSettings(path);
         }
 
         private static IEnumerable<ClusterConfigPath> EnumeratePrefixes(ClusterConfigPath path)

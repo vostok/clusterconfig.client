@@ -18,6 +18,12 @@ namespace Vostok.ClusterConfig.Client
         /// <summary>
         /// Second binary protocol. Very effective: send patches for zone instead full zone.
         /// </summary>
-        V2 = 2
+        V2 = 2,
+        
+        /// <summary>
+        /// Third binary protocol. Send requests for subtrees instead full zone.
+        /// Rollback to whole zone requests if requested too many subtrees.
+        /// </summary>
+        V3 = 3
     }
 }
