@@ -23,6 +23,7 @@ internal class RemoteSubtrees
             if (!subtreePath.IsPrefixOf(path))
                 continue;
             
+            //TODO откусить часть path, которую нашли в префиксе?
             result = remoteTree.GetSettings(path);
             return true;
         }

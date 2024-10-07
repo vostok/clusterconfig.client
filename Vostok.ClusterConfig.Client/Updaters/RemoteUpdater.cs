@@ -319,7 +319,10 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
             LogReceivedNewZone(tree, version, replica, true, protocol, responsesDescriptions);
 
-            return new RemoteUpdateResult(true, tree, version, recommendedProtocol, null);
+            // todo (deniaa, 04.10.2024): вообще какая-то дурацкая ситуация, если мы откатились с V3 на V2 и словили патч...
+            // TODO Как будто, коли мы работаем с FullTree, нам наши поддеревья не нужны.
+            // TODO вероятно надо будет переделать, когда полное дерево будем спрашивать и через поддеревья
+            return new RemoteUpdateResult(true, tree, false, null, version, recommendedProtocol, null);
         }
 
         private bool TryApplyPatch(ClusterConfigProtocolVersion protocol, Response response, RemoteUpdateResult old, DateTime version, out byte[] newZone, string responsesDescriptions)

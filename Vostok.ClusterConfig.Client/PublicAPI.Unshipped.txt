@@ -1,0 +1,1 @@
+Vostok.ClusterConfig.Client.ClusterConfigProtocolVersion.V3 = 3 -> Vostok.ClusterConfig.Client.ClusterConfigProtocolVersion
