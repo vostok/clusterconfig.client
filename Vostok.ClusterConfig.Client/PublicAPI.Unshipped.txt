@@ -1,1 +1,4 @@
+const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.MaximumSubtrees = 30 -> int
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.MaximumSubtrees.get -> int
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.MaximumSubtrees.set -> void
 Vostok.ClusterConfig.Client.ClusterConfigProtocolVersion.V3 = 3 -> Vostok.ClusterConfig.Client.ClusterConfigProtocolVersion

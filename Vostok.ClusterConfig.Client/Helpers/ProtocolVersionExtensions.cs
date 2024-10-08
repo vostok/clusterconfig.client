@@ -18,6 +18,8 @@ namespace Vostok.ClusterConfig.Client.Helpers
                     return "_v1/zone";
                 case ClusterConfigProtocolVersion.V2:
                     return "_v2/zone";
+                case ClusterConfigProtocolVersion.V3:
+                    return "_v3/subtrees";
                 case var x:
                     throw new InvalidOperationException($"Unknown protocol version '{x}'");
             }

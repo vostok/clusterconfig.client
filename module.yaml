@@ -16,7 +16,7 @@ notests *default:
     - vostok.clusterclient.transport
     - vostok.configuration.abstractions
     - vostok.configuration.sources
-    - vostok.clusterconfig.client.abstractions
+    - vostok.clusterconfig.client.abstractions@IsPrefixOf-optimization
     - vostok.clusterconfig.core/src@subtrees-protocol
     - vostok.commons.collections/src
     - vostok.commons.helpers/src

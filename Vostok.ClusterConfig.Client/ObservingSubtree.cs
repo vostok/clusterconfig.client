@@ -6,17 +6,14 @@ namespace Vostok.ClusterConfig.Client;
 
 internal class ObservingSubtree
 {
-    public ObservingSubtree(
-        ClusterConfigPath path, 
-        TaskCompletionSource<bool> completionSource, 
-        DateTime? lastVersion)
+    public ObservingSubtree(ClusterConfigPath path)
     {
         Path = path;
-        CompletionSource = completionSource;
-        LastVersion = lastVersion;
+        AtLeastOnceObtaining = new TaskCompletionSource<bool>();
+        LastVersion = null;
     }
 
     public ClusterConfigPath Path { get; }
-    public TaskCompletionSource<bool> CompletionSource { get; }
-    public DateTime? LastVersion { get; }
+    public TaskCompletionSource<bool> AtLeastOnceObtaining { get; }
+    public DateTime? LastVersion { get; set; }
 }

@@ -56,6 +56,7 @@ namespace Vostok.ClusterConfig.Client
             observablePropagationLock = new object();
             internedValuesCache = settings.InternedValuesCacheCapacity > 0 ? new RecyclingBoundedCache<string, string>(settings.InternedValuesCacheCapacity) : null;
             immediatelyUpdateTokenSource = new CancellationTokenSource();
+            subtreesObservingState = new SubtreesObservingState(this.settings.MaximumSubtrees);
         }
 
         /// <summary>
@@ -162,6 +163,8 @@ namespace Vostok.ClusterConfig.Client
         {
             InitiatePeriodicUpdates();
 
+            //TODO плохая ситуация: мы скачали маленькое дерево, запросили дерево побольше, оно вытеснило наше маленькое дерево из subtreesObservingState.
+            //Затем мы снова просим маленькое дерево, находим в subtreesObservingState только большое, и... начинаем его ждать! Хотя ответ у нас уже есть.
             if (subtreesObservingState.TryAddSubtree(clusterConfigPath, out var tcs))
             {
                 immediatelyUpdateTokenSource.Cancel();
@@ -179,7 +182,9 @@ namespace Vostok.ClusterConfig.Client
             if (subtreesObservingState.TryAddSubtree(clusterConfigPath, out var tcs))
             {
                 immediatelyUpdateTokenSource.Cancel();
-                //TODO комментарий, почему не надо ждать, как в Get
+                //(deniaa): Compare with ObtainStateAsync method here we will not wait for the first settings from server for given path.
+                //(deniaa): It's an observable and it will notify subscribers when a value is recieved.
+                //(deniaa): So here we just cancel token to force the update.  
             }
             
             return stateObservable;
@@ -238,7 +243,7 @@ namespace Vostok.ClusterConfig.Client
                 try
                 {
                     var localUpdateResult = localUpdater.Update(lastLocalResult);
-                    var observingSubtrees = subtreesObservingState.ObservingSubtrees;
+                    var observingSubtrees = subtreesObservingState.GetSubtreesToRequest();
                     var remoteUpdateResult = await remoteUpdater.UpdateAsync(observingSubtrees, protocol, lastRemoteResult, cancellationToken).ConfigureAwait(false);
 
                     if (remoteUpdateResult.RecommendedProtocol is {} recommendedProtocol && settings.ForcedProtocolVersion == null)
@@ -253,8 +258,10 @@ namespace Vostok.ClusterConfig.Client
                     if (currentState == null || localUpdateResult.Changed || remoteUpdateResult.Changed || remoteUpdateResult.ChangedSubtrees)
                         PropagateNewState(CreateNewState(currentState, localUpdateResult, remoteUpdateResult), cancellationToken);
                     if (observingSubtrees != null)
-                        foreach (var observingSubtree in observingSubtrees)
-                            observingSubtree.CompletionSource.TrySetResult(true);
+                    {
+                        //(deniaa): Подумать над версиями в каждой ноде, чтобы отслеживать отсутствие изменений в них более точечно.
+                        subtreesObservingState.FinalizeSubtrees(observingSubtrees, remoteUpdateResult.Version);
+                    }
 
                     lastLocalResult = localUpdateResult;
                     lastRemoteResult = remoteUpdateResult;
@@ -301,7 +308,6 @@ namespace Vostok.ClusterConfig.Client
         private RemoteUpdater CreateRemoteUpdater()
             => new RemoteUpdater(
                 settings.EnableClusterSettings,
-                subtreesObservingState,
                 settings.Cluster,
                 settings.AdditionalSetup,
                 internedValuesCache,

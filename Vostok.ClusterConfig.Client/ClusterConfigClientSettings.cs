@@ -86,6 +86,15 @@ namespace Vostok.ClusterConfig.Client
         /// If the value is less or equal to zero, no interning will be used. The default value is 0.
         /// </summary>
         public int InternedValuesCacheCapacity { get; set; } = ClusterConfigClientDefaults.InternedValuesCacheCapacity;
+        
+        /// <summary>
+        /// Gets or sets the capacity of the structure to store and control settings subtrees to not download the full tree.
+        /// Works only if <see cref="ForcedProtocolVersion"/> is <see cref="ClusterConfigProtocolVersion.V3"/> (it is by default).
+        /// If the value is less or equal to zero, whole tree downloading will be used. The default value is <see cref="ClusterConfigClientDefaults.MaximumSubtrees"/>.
+        /// If more different <see cref="ClusterConfigPath"/> are requested than the configured limit, full tree download will be used instead.
+        /// Client may exceed count of subtrees by no more than two times, in case of different races.
+        /// </summary>
+        public int MaximumSubtrees { get; set; } = ClusterConfigClientDefaults.MaximumSubtrees;
 
         /// <summary>
         /// <para>Gets or sets the maximum allowed file size. Local files larger than this will be ignored.</para>

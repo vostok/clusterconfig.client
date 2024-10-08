@@ -7,23 +7,26 @@ namespace Vostok.ClusterConfig.Client.Helpers;
 
 internal class RemoteSubtrees
 {
-    public RemoteSubtrees([NotNull] List<(ClusterConfigPath, RemoteTree)> subtrees)
+    public RemoteSubtrees([NotNull] Dictionary<ClusterConfigPath, RemoteTree> subtrees)
     {
         Subtrees = subtrees;
     }
     
-    public List<(ClusterConfigPath, RemoteTree)> Subtrees { get; }
+    public Dictionary<ClusterConfigPath, RemoteTree> Subtrees { get; }
 
     public bool TryGetSettings(ClusterConfigPath path, [CanBeNull] out ISettingsNode result)
     {
         result = null;
-        foreach (var (subtreePath, remoteTree) in Subtrees)
+        foreach (var pair in Subtrees)
         {
-            //TODO IsPrefixOf переписать на спанах
+            var subtreePath = pair.Key;
+            var remoteTree = pair.Value;
             if (!subtreePath.IsPrefixOf(path))
                 continue;
-            
-            //TODO откусить часть path, которую нашли в префиксе?
+
+            //TODO (deniaa) кажется это норма, когда remoteTree null. А не буффер в нём. Надо здесь это обработать.
+            //TODO (deniaa) Tests
+            path = path.ToString().Substring(subtreePath.ToString().Length);
             result = remoteTree.GetSettings(path);
             return true;
         }

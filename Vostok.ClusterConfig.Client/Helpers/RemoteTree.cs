@@ -11,7 +11,7 @@ namespace Vostok.ClusterConfig.Client.Helpers
     {
         private readonly ITreeSerializer serializer;
 
-        public RemoteTree(ClusterConfigProtocolVersion protocol, byte[] serialized, ITreeSerializer serializer, [CanBeNull] string description)
+        public RemoteTree(ClusterConfigProtocolVersion protocol, ArraySegment<byte>? serialized, ITreeSerializer serializer, [CanBeNull] string description)
         {
             Protocol = protocol;
             Serialized = serialized;
@@ -20,17 +20,20 @@ namespace Vostok.ClusterConfig.Client.Helpers
             this.serializer = serializer;
         }
 
-        public int Size => Serialized?.Length ?? 0;
+        public int Size => Serialized?.Count ?? 0;
 
         public ClusterConfigProtocolVersion Protocol { get; }
         
-        public byte[] Serialized { get; }
+        public ArraySegment<byte>? Serialized { get; }
         
         [CanBeNull]
         public string Description { get; }
 
         [CanBeNull]
         public ISettingsNode GetSettings(ClusterConfigPath path)
-            => serializer.Deserialize(new BinaryBufferReader(Serialized, 0), path.Segments);
+        {
+            var segment = Serialized.Value;
+            return serializer.Deserialize(new BinaryBufferReader(segment.Array, segment.Offset), path.Segments);
+        }
     }
 }

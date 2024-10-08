@@ -32,7 +32,6 @@ namespace Vostok.ClusterConfig.Client.Updaters
         private static readonly DateTime EmptyResultVersion = DateTime.MinValue;
 
         private readonly bool enabled;
-        private readonly SubtreesObservingState subtreesObservingState;
         private readonly IClusterClient client;
         private readonly RecyclingBoundedCache<string, string> interningCache;
         private readonly ILog log;
@@ -41,7 +40,6 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
         public RemoteUpdater(
             bool enabled,
-            SubtreesObservingState subtreesObservingState,
             IClusterClient client,
             RecyclingBoundedCache<string, string> interningCache,
             ILog log,
@@ -49,7 +47,6 @@ namespace Vostok.ClusterConfig.Client.Updaters
             bool assumeClusterConfigDeployed = false)
         {
             this.enabled = enabled;
-            this.subtreesObservingState = subtreesObservingState;
             this.client = client;
             this.interningCache = interningCache;
             this.log = log;
@@ -59,7 +56,6 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
         public RemoteUpdater(
             bool enabled,
-            SubtreesObservingState subtreesObservingState,
             IClusterProvider cluster,
             ClusterClientSetup setup,
             RecyclingBoundedCache<string, string> interningCache,
@@ -67,7 +63,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             string zone,
             TimeSpan timeout,
             bool assumeClusterConfigDeployed = false)
-            : this(enabled, subtreesObservingState, enabled ? CreateClient(cluster, setup, log, timeout) : null, interningCache, log, zone, assumeClusterConfigDeployed)
+            : this(enabled, enabled ? CreateClient(cluster, setup, log, timeout) : null, interningCache, log, zone, assumeClusterConfigDeployed)
         {
         }
 
@@ -156,7 +152,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 .WithAcceptEncodingHeader("gzip");
 
             if (protocol == ClusterConfigProtocolVersion.V3 && observingSubtrees != null)
-                request = request.WithContent(Serialize(observingSubtrees));
+                request = request.WithContent(SerializeRequest(observingSubtrees));
 
             //TODO Если бэк чекает заголовок где-то в самом начале и не даёт нормально обработать тело, то надо бы не писать его
             //TODO Пока я его оставил тут для обработки случая, когда поддеревьев нет и надо вернуть всё дерево.
@@ -173,19 +169,17 @@ namespace Vostok.ClusterConfig.Client.Updaters
             return request;
         }
 
-        private Content Serialize(List<ObservingSubtree> observingSubtrees)
+        private static Content SerializeRequest(List<ObservingSubtree> observingSubtrees)
         {
             //TODO что-то сделать с размером и\или пулингом.
             var writer = new BinaryBufferWriter(1024);
             
-            writer.Write(observingSubtrees.Count);
-            foreach (var observingSubtree in observingSubtrees)
-            {
-                writer.WriteWithLength(observingSubtree.Path.ToString());
-                writer.Write(observingSubtree.LastVersion != null);
-                if (observingSubtree.LastVersion != null)
-                    writer.Write(observingSubtree.LastVersion.Value.ToUniversalTime().Ticks);
-            }
+            writer.WriteCollection(observingSubtrees,
+                (binaryWriter, subtree) =>
+                {
+                    binaryWriter.WriteWithLength(subtree.Path.ToString());
+                    binaryWriter.WriteNullable(subtree.LastVersion, (bw, time) => bw.Write(time.ToUniversalTime().Ticks));
+                });
             
             return new Content(writer.Buffer);
         }
@@ -278,24 +272,51 @@ namespace Vostok.ClusterConfig.Client.Updaters
             RemoteSubtrees remoteSubtrees = null;
             if (protocol == ClusterConfigProtocolVersion.V3)
             {
-                //TODO нельзя ли ссылаться на буффер из контента?..
-                var reader = new BinaryBufferReader(response.Content.Buffer, 0);
-
-                var subtreesCount = reader.ReadInt32();
-                var subtrees = new List<(ClusterConfigPath, RemoteTree)>(subtreesCount);
-                for (var i = 0; i < subtreesCount; i++)
-                {
-                    var path = reader.ReadString(Encoding.UTF8);
-                    var array = reader.ReadByteArray();
-                    subtrees.Add((path, new RemoteTree(protocol, array, serializer, description)));
-                }
-                remoteSubtrees = new RemoteSubtrees(subtrees);
+                remoteSubtrees = DeserializeRemoteSubtrees(protocol, response, lastResult, serializer, description);
             }
-            var tree = new RemoteTree(protocol, response.Content.ToArray(), serializer, description);
+            var tree = new RemoteTree(protocol, new ArraySegment<byte>(response.Content.ToArray()), serializer, description);
 
             LogReceivedNewZone(tree, version, replica, false, protocol, responsesDescriptions);
 
             return new RemoteUpdateResult(true, tree, true, remoteSubtrees, version, recommendedProtocol, null);
+        }
+
+        private static RemoteSubtrees DeserializeRemoteSubtrees(ClusterConfigProtocolVersion protocol, Response response, RemoteUpdateResult lastResult, ITreeSerializer serializer, string description)
+        {
+            //(deniaa): Until we override BufferFactory for transport and create a buffer for gzip decompression, each Content is a new byte array. So we can refer to subsequences of it. 
+            var reader = new BinaryBufferReader(response.Content.Buffer, 0);
+
+            var subtreesCount = reader.ReadInt32();
+            var subtrees = new Dictionary<ClusterConfigPath, RemoteTree>(subtreesCount);
+            for (var i = 0; i < subtreesCount; i++)
+            {
+                var path = reader.ReadString(Encoding.UTF8);
+                var wasModified = reader.ReadBool();
+                if (wasModified)
+                {
+                    var hasSubtree = reader.ReadBool();
+                    if (hasSubtree)
+                    {
+                        var arrayLength = reader.ReadInt32();
+                        var segment = new ArraySegment<byte>(reader.Buffer, (int)reader.Position, arrayLength);
+                        subtrees.Add(path, new RemoteTree(protocol, segment, serializer, description));
+                        reader.Position += arrayLength;
+                    }
+                    else
+                    {
+                        subtrees.Add(path, null);
+                    }
+                }
+                else
+                {
+                    if (lastResult?.Subtrees != null && lastResult.Subtrees.Subtrees.TryGetValue(path, out var previousTree))
+                    {
+                        subtrees.Add(path, previousTree);
+                    }
+                }
+            }
+
+            return new RemoteSubtrees(subtrees);
         }
 
         private RemoteUpdateResult CreateResultViaPatch(ClusterConfigProtocolVersion protocol, Response response, DateTime version, Uri replica, RemoteUpdateResult lastResult, ClusterConfigProtocolVersion? recommendedProtocol, string responsesDescriptions)
@@ -315,7 +336,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             if (!EnsureHashValid(newZone, response, version, true, responsesDescriptions))
                 return CreatePatchingFailedResult(lastResult, recommendedProtocol, PatchingFailedReason.HashMismatch);
 
-            var tree = new RemoteTree(protocol, newZone, protocol.GetSerializer(interningCache), GetDescription(response));
+            var tree = new RemoteTree(protocol, new ArraySegment<byte>(newZone), protocol.GetSerializer(interningCache), GetDescription(response));
 
             LogReceivedNewZone(tree, version, replica, true, protocol, responsesDescriptions);
 
@@ -329,7 +350,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
         {
             try
             {
-                newZone = protocol.GetPatcher(interningCache).ApplyPatch(old.Tree!.Serialized, response.Content.ToArray());
+                newZone = protocol.GetPatcher(interningCache).ApplyPatch(old.Tree!.Serialized!.Value, response.Content.ToArray());
                 return true;
             }
             catch (Exception e)
