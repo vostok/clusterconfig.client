@@ -4,14 +4,19 @@ using Vostok.ClusterConfig.Client.Helpers;
 
 namespace Vostok.ClusterConfig.Client.Updaters
 {
+    /// <summary>
+    /// Due to possibility to change protocol in runtime we have to deal with old RemoteTree <see cref="Tree"/> in pair with new RemoteSubtrees <see cref="Subtrees"/>.
+    /// So we have an invariant: at one moment only one of this two "trees" can be not null (both can be null).
+    /// If, occasionally, both are not null, recommended to use an old single full tree RemoteTree <see cref="Tree"/>.
+    /// </summary>
     internal class RemoteUpdateResult
     {
-        //TODO а не убрать ли RemoteTree целиком внутрь RemoteSubtrees как поддерево с путём "/"?..
         public RemoteUpdateResult(
             bool changedFullTree,
             [CanBeNull] RemoteTree fullTree,
             bool changedSubtrees,
             [CanBeNull] RemoteSubtrees subtrees,
+            ClusterConfigProtocolVersion? usedProtocol,
             DateTime version,
             ClusterConfigProtocolVersion? recommendedProtocol,
             PatchingFailedReason? patchingFailedReason)
@@ -23,18 +28,20 @@ namespace Vostok.ClusterConfig.Client.Updaters
             Version = version;
             RecommendedProtocol = recommendedProtocol;
             PatchingFailedReason = patchingFailedReason;
+            UsedProtocol = usedProtocol;
         }
-
 
         public bool Changed { get; }
 
         [CanBeNull]
         public RemoteTree Tree { get; }
 
-        public bool ChangedSubtrees { get; set; }
+        public bool ChangedSubtrees { get; }
         
         [CanBeNull]
-        public RemoteSubtrees Subtrees { get; set; }
+        public RemoteSubtrees Subtrees { get; }
+        
+        public ClusterConfigProtocolVersion? UsedProtocol { get; }
 
         public DateTime Version { get; }
         

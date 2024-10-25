@@ -18,12 +18,12 @@ internal class SubtreesObservingState
     private readonly object lockObject = new();
     private readonly int maxSubtrees;
     
-    //TODO актуализировать доку, когда разберемся с nullы 
     /// <summary>
     /// Empty = no one subtree is under observation (initial state)
-    /// Null = too much subtrees are under observation, need to get whole tree (terminal state)
+    /// 1+ ObservingSubtrees = common situation (intermediate and normal state) 
+    /// Single ObservingSubtree with empty ("") path = downgraded to full tree downloading (terminal state).
     /// </summary>
-    private List<ObservingSubtree> observingSubtrees;
+    [NotNull] private List<ObservingSubtree> observingSubtrees;
     
     public SubtreesObservingState(int maxSubtrees)
     {
@@ -35,9 +35,6 @@ internal class SubtreesObservingState
     public List<ObservingSubtree> GetSubtreesToRequest()
     {
         var cachedObservingSubtrees = observingSubtrees;
-        //TODO убрать, если будем класть корень сюда же
-        if (cachedObservingSubtrees == null)
-            return null;
 
         var subtrees = new List<ObservingSubtree>(cachedObservingSubtrees.Count);
         //(deniaa): It's better to do it in the opposite direction, if s[i] is a prefix of s[j], then i > j, so it's easier to not add than to remove.
@@ -60,18 +57,12 @@ internal class SubtreesObservingState
         return false;
     }
 
-    /// <param name="newSubtree"></param>
+    /// <param name="newSubtree">Path to subtree.</param>
     /// <param name="taskCompletionSource">Source to indicate was this subtree downloaded at least once</param>
     /// <returns>Returns True if new subtree was added and need to initiate downloading.</returns>
     public bool TryAddSubtree(ClusterConfigPath newSubtree, out TaskCompletionSource<bool> taskCompletionSource)
     {
         var cachedObservingSubtrees = observingSubtrees;
-        //TODO убрать, если будем класть корень сюда же
-        if (cachedObservingSubtrees == null)
-        {
-            taskCompletionSource = completed;
-            return false;
-        }
 
         if (AlreadyUnderObservation(cachedObservingSubtrees, newSubtree, out taskCompletionSource))
             return false;
@@ -85,18 +76,16 @@ internal class SubtreesObservingState
         {
             taskCompletionSource = completed;
             var cachedObservingSubtrees = observingSubtrees;
-            //TODO убрать, если будем класть корень сюда же
-            if (cachedObservingSubtrees == null)
-                return false;
 
             //(deniaa): It's important to double check it
             if (AlreadyUnderObservation(cachedObservingSubtrees, newSubtree, out taskCompletionSource))
                 return false;
-
-            //(deniaa): Here we can add a bit more prefixes, because some of them we can remove in finalization phase.
-            if (cachedObservingSubtrees.Count > maxSubtrees * 2)
+            
+            //(deniaa): Yes, if we add /a/a/a, then /a/a, then /a, after finalization phase we will have only one /a path.
+            //(deniaa): And here we can harry to set a 
+            if (cachedObservingSubtrees.Count > maxSubtrees)
             {
-                return AddRootOrSetNull(out taskCompletionSource);
+                newSubtree = "/";
             }
             
             var newSubtrees = new List<ObservingSubtree>(cachedObservingSubtrees.Count + 1);
@@ -109,13 +98,6 @@ internal class SubtreesObservingState
             taskCompletionSource = newObservingSubtree.AtLeastOnceObtaining;
             return true;
         }
-    }
-
-    private bool AddRootOrSetNull(out TaskCompletionSource<bool> taskCompletionSource)
-    {
-        //TODO Переделать на добавление корня, если выберем такой путь.
-        taskCompletionSource = completed;
-        return false;
     }
 
     public void FinalizeSubtrees(List<ObservingSubtree> observingSubtreesToFinalize, DateTime dateTime)
@@ -131,12 +113,6 @@ internal class SubtreesObservingState
 
             CleanupLeafSubtrees(subtreeToFinalize);
         }
-        
-        var cachedObservingSubtrees = observingSubtrees;
-        if (cachedObservingSubtrees != null && cachedObservingSubtrees.Count > maxSubtrees)
-        {
-            //TODO Add root, or set null to ObservingSubtrees!
-        }
     }
 
     private void CleanupLeafSubtrees(ObservingSubtree finalizedSubtree)
@@ -145,10 +121,6 @@ internal class SubtreesObservingState
         lock (lockObject)
         {
             var cachedObservingSubtrees = observingSubtrees;
-            //TODO если тут null, то можно ничего не делать, потому что мы откатились к полному дерево
-            //TODO но если полное дерево будем хранить здесь же, то null не возможен.
-            if (cachedObservingSubtrees == null)
-                return;
             
             //(deniaa): Delete those subtrees that are to the left of us and we are a prefix for them. 
             HashSet<ObservingSubtree> subtreesToRemove = null;

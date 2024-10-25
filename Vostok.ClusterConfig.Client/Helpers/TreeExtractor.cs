@@ -47,10 +47,17 @@ namespace Vostok.ClusterConfig.Client.Helpers
 
         private static ISettingsNode GetRemoteSettings(ClusterConfigClientState state, ClusterConfigPath path)
         {
-            if (state.RemoteSubtrees != null && state.RemoteSubtrees.TryGetSettings(path, out var settings))
-                return settings;
+            if (state.RemoteTree != null)
+            {
+                return state.RemoteTree.GetSettings(path);
+            }
 
-            return state.RemoteTree?.GetSettings(path);
+            if (state.RemoteSubtrees != null)
+            {
+                return state.RemoteSubtrees.GetSettings(path);
+            }
+
+            return null;
         }
 
         private static IEnumerable<ClusterConfigPath> EnumeratePrefixes(ClusterConfigPath path)

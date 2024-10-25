@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -72,7 +74,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             if (!enabled)
                 return CreateEmptyResult(lastResult);
 
-            var protocolChanged = lastResult?.Tree?.Protocol is {} lastProtocol && lastProtocol != protocol;
+            var protocolChanged = lastResult?.UsedProtocol is {} lastProtocol && lastProtocol != protocol;
             var request = CreateRequest(observingSubtrees, protocol, lastResult?.Version, protocolChanged, lastResult?.PatchingFailedReason);
             var requestPriority = lastResult == null ? RequestPriority.Critical : RequestPriority.Ordinary;
             var requestResult = await client.SendAsync(request, priority: requestPriority, cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -86,8 +88,8 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
             return requestResult.Response.Code switch
             {
-                ResponseCode.NotModified => HandleNotModifiedResponse(lastResult, requestResult.Response),
-                ResponseCode.Ok or ResponseCode.PartialContent => HandleSuccessResponse(observingSubtrees, protocol, lastResult, requestResult.Response, requestResult.Replica, protocolChanged),
+                ResponseCode.NotModified => HandleNotModifiedResponse(protocol, lastResult, requestResult.Response),
+                ResponseCode.Ok or ResponseCode.PartialContent => HandleSuccessResponse(protocol, lastResult, requestResult.Response, requestResult.Replica, protocolChanged),
                 _ => throw NoAcceptableResponseException(requestResult)
             };
         }
@@ -139,10 +141,29 @@ namespace Vostok.ClusterConfig.Client.Updaters
         }
 
         private static RemoteUpdateResult CreateEmptyResult([CanBeNull] RemoteUpdateResult lastResult)
-            => new(lastResult?.Version != EmptyResultVersion, null, lastResult?.Version != EmptyResultVersion, null, lastResult?.Version ?? EmptyResultVersion, lastResult?.RecommendedProtocol, lastResult?.PatchingFailedReason);
+            => new(
+                lastResult?.Version != EmptyResultVersion, 
+                null, 
+                lastResult?.Version != EmptyResultVersion, 
+                null, 
+                lastResult?.UsedProtocol, 
+                lastResult?.Version ?? EmptyResultVersion, 
+                lastResult?.RecommendedProtocol, 
+                lastResult?.PatchingFailedReason);
 
-        private static RemoteUpdateResult CreatePatchingFailedResult([CanBeNull] RemoteUpdateResult lastResult, ClusterConfigProtocolVersion? recommendedProtocol, PatchingFailedReason reason)
-            => new(false, lastResult?.Tree, false, lastResult?.Subtrees, lastResult?.Version ?? EmptyResultVersion, recommendedProtocol, reason);
+        private static RemoteUpdateResult CreatePatchingFailedResult(
+            [CanBeNull] RemoteUpdateResult lastResult, 
+            ClusterConfigProtocolVersion? recommendedProtocol, 
+            PatchingFailedReason reason)
+            => new(
+                false, 
+                lastResult?.Tree, 
+                false, 
+                lastResult?.Subtrees, 
+                lastResult?.UsedProtocol, 
+                lastResult?.Version ?? EmptyResultVersion, 
+                recommendedProtocol, 
+                reason);
 
         private Request CreateRequest(List<ObservingSubtree> observingSubtrees, ClusterConfigProtocolVersion protocol, DateTime? lastVersion, bool protocolChanged, PatchingFailedReason? patchingFailedReason)
         {
@@ -152,15 +173,11 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 .WithAcceptEncodingHeader("gzip");
 
             if (protocol == ClusterConfigProtocolVersion.V3 && observingSubtrees != null)
-                request = request.WithContent(SerializeRequest(observingSubtrees));
+                request = request.WithContent(SerializeRequest(observingSubtrees, patchingFailedReason != null || protocolChanged));
 
-            //TODO Если бэк чекает заголовок где-то в самом начале и не даёт нормально обработать тело, то надо бы не писать его
-            //TODO Пока я его оставил тут для обработки случая, когда поддеревьев нет и надо вернуть всё дерево.
-            //TODO Но поди надо будет убрать эту логику вообще про null и сделать так, чтобы корень был единственным поддеревом, когда нужно всё дерево 
             if (protocol < ClusterConfigProtocolVersion.V3 && lastVersion.HasValue)
                 request = request.WithIfModifiedSinceHeader(lastVersion.Value);
 
-            //(deniaa): all this staff around ForceFull just for metrics purposes on backend... 
             if (patchingFailedReason != null)
                 request = request.WithAdditionalQueryParameter(ClusterConfigQueryParameters.ForceFull, patchingFailedReason.ToString());
             else if (protocolChanged)
@@ -169,18 +186,19 @@ namespace Vostok.ClusterConfig.Client.Updaters
             return request;
         }
 
-        private static Content SerializeRequest(List<ObservingSubtree> observingSubtrees)
+        private static Content SerializeRequest(List<ObservingSubtree> observingSubtrees, bool forceFullUpdate)
         {
             //TODO что-то сделать с размером и\или пулингом.
             var writer = new BinaryBufferWriter(1024);
             
-            writer.WriteCollection(observingSubtrees,
-                (binaryWriter, subtree) =>
-                {
-                    binaryWriter.WriteWithLength(subtree.Path.ToString());
-                    binaryWriter.WriteNullable(subtree.LastVersion, (bw, time) => bw.Write(time.ToUniversalTime().Ticks));
-                });
-            
+            writer.Write(observingSubtrees.Count);
+            foreach (var subtree in observingSubtrees)
+            {
+                writer.WriteWithLength(subtree.Path.ToString());
+                writer.WriteNullable(subtree.LastVersion, (bw, time) => bw.Write(time.ToUniversalTime().Ticks));
+                writer.Write(forceFullUpdate);
+            }
+
             return new Content(writer.Buffer);
         }
 
@@ -194,7 +212,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
                     // (iloktionov): we just silently assume CC is not deployed in current environment and return empty settings.
 
                     // (tsup): We make assumptions above in case we are not forced to assume that cluster config is deployed.
-                    if (lastUpdateResult?.Tree == null && !assumeClusterConfigDeployed)
+                    if (lastUpdateResult?.Tree == null && lastUpdateResult?.Subtrees == null && !assumeClusterConfigDeployed)
                     {
                         if (lastUpdateResult == null)
                             LogAssumingNoServer();
@@ -223,16 +241,16 @@ namespace Vostok.ClusterConfig.Client.Updaters
         }
 
         [NotNull]
-        private RemoteUpdateResult HandleNotModifiedResponse(RemoteUpdateResult lastUpdateResult, Response response)
+        private RemoteUpdateResult HandleNotModifiedResponse(ClusterConfigProtocolVersion protocol, RemoteUpdateResult lastUpdateResult, Response response)
         {
             if (lastUpdateResult == null)
                 throw UnexpectedNotModifiedResponseException();
 
-            return new RemoteUpdateResult(false, lastUpdateResult.Tree, false, lastUpdateResult.Subtrees, lastUpdateResult.Version, GetRecommendedProtocolVersion(response), lastUpdateResult.PatchingFailedReason);
+            return new RemoteUpdateResult(false, lastUpdateResult.Tree, false, lastUpdateResult.Subtrees, protocol, lastUpdateResult.Version, GetRecommendedProtocolVersion(response), lastUpdateResult.PatchingFailedReason);
         }
 
         [NotNull]
-        private RemoteUpdateResult HandleSuccessResponse(List<ObservingSubtree> observingSubtrees, ClusterConfigProtocolVersion protocol, RemoteUpdateResult lastUpdateResult, Response response, Uri replica, bool protocolChanged)
+        private RemoteUpdateResult HandleSuccessResponse(ClusterConfigProtocolVersion protocol, RemoteUpdateResult lastUpdateResult, Response response, Uri replica, bool protocolChanged)
         {
             if (response.Headers.LastModified == null)
                 throw new RemoteUpdateException($"Received a {response.Code} response without 'LastModified' header.");
@@ -250,18 +268,25 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 if (version < lastUpdateResult.Version)
                     LogStaleVersion(version, lastUpdateResult.Version, protocol, responsesDescriptions);
 
-                return new RemoteUpdateResult(false, lastUpdateResult.Tree, false, lastUpdateResult.Subtrees, lastUpdateResult.Version, recommendedProtocol, lastUpdateResult.PatchingFailedReason);
+                return new RemoteUpdateResult(false, lastUpdateResult.Tree, false, lastUpdateResult.Subtrees, protocol, lastUpdateResult.Version, recommendedProtocol, lastUpdateResult.PatchingFailedReason);
             }
 
             return response.Code switch
             {
-                ResponseCode.Ok => CreateResultViaFullZone(protocol, response, version, replica, lastUpdateResult, recommendedProtocol, responsesDescriptions),
+                ResponseCode.Ok => CreateResultViaFullZoneOrV3(protocol, response, version, replica, lastUpdateResult, recommendedProtocol, responsesDescriptions),
                 ResponseCode.PartialContent => CreateResultViaPatch(protocol, response, version, replica, lastUpdateResult, recommendedProtocol, responsesDescriptions),
                 var code => throw new RemoteUpdateException($"Failed to update settings from server: unknown successful response code {code}")
             };
         }
 
-        private RemoteUpdateResult CreateResultViaFullZone(ClusterConfigProtocolVersion protocol, Response response, DateTime version, Uri replica, RemoteUpdateResult lastResult, ClusterConfigProtocolVersion? recommendedProtocol, string responsesDescriptions)
+        private RemoteUpdateResult CreateResultViaFullZoneOrV3(
+            ClusterConfigProtocolVersion protocol, 
+            Response response, 
+            DateTime version,
+            Uri replica, 
+            RemoteUpdateResult lastResult, 
+            ClusterConfigProtocolVersion? recommendedProtocol,
+            string responsesDescriptions)
         {
             if (!response.HasContent)
                 throw new RemoteUpdateException($"Received an empty {response.Code} response from server. Nothing to deserialize. {responsesDescriptions}.");
@@ -270,21 +295,54 @@ namespace Vostok.ClusterConfig.Client.Updaters
             var description = GetDescription(response);
             
             RemoteSubtrees remoteSubtrees = null;
+            RemoteTree tree = null;
+            int treesSize;
             if (protocol == ClusterConfigProtocolVersion.V3)
             {
-                remoteSubtrees = DeserializeRemoteSubtrees(protocol, response, lastResult, serializer, description);
+                //(deniaa): Only patch applying can fail deserialization
+                if (!TryDeserializeRemoteSubtrees(protocol, response, version, lastResult, serializer, description, out remoteSubtrees))
+                {
+                    return CreatePatchingFailedResult(lastResult, recommendedProtocol, PatchingFailedReason.ApplyPatchFailed);
+                }
+                
+                treesSize = remoteSubtrees.Subtrees.Sum(x => x.Value.Size);
             }
-            var tree = new RemoteTree(protocol, new ArraySegment<byte>(response.Content.ToArray()), serializer, description);
+            else
+            {
+                tree = new RemoteTree(new ArraySegment<byte>(response.Content.ToArray()), serializer, description);
+                treesSize = tree.Size;
+            }
 
-            LogReceivedNewZone(tree, version, replica, false, protocol, responsesDescriptions);
+            LogReceivedNewZone(treesSize, version, replica, false, protocol, responsesDescriptions);
 
-            return new RemoteUpdateResult(true, tree, true, remoteSubtrees, version, recommendedProtocol, null);
-        }
-
-        private static RemoteSubtrees DeserializeRemoteSubtrees(ClusterConfigProtocolVersion protocol, Response response, RemoteUpdateResult lastResult, ITreeSerializer serializer, string description)
+            //TODO передавать changed = true для обоих типов дерева как будто не верно
+            return new RemoteUpdateResult(true, tree, true, remoteSubtrees, protocol, version, recommendedProtocol, null);
+        }        
+        
+        //(deniaa):
+        //[SubtreesCount (int32)]
+        //    [Prefix + Length (int32 + string_utf8)]
+        //    [WasModified (byte)]
+        //    if (WasModified)
+        //        [HasSubtree (byte)]
+        //        if (HasSubtree) 
+        //            [IsPatch (byte)]
+        //            [IsCompressed (byte)]
+        //            [SerializedTree + Length (int32 + byte_array)]
+        private bool TryDeserializeRemoteSubtrees(
+            ClusterConfigProtocolVersion protocol,
+            Response response,
+            DateTime version,
+            RemoteUpdateResult lastResult,
+            ITreeSerializer serializer,
+            string description,
+            out RemoteSubtrees remoteSubtrees)
         {
-            //(deniaa): Until we override BufferFactory for transport and create a buffer for gzip decompression, each Content is a new byte array. So we can refer to subsequences of it. 
-            var reader = new BinaryBufferReader(response.Content.Buffer, 0);
+            remoteSubtrees = null;
+            
+            //(deniaa): Until we override BufferFactory for transport and create a buffer for gzip decompression, each Content is a new byte array. So we can refer to subsequences of it.
+            var responseContent = response.Content.ToArraySegment();
+            var reader = new BinaryBufferReader(responseContent.Array!, responseContent.Offset);
 
             var subtreesCount = reader.ReadInt32();
             var subtrees = new Dictionary<ClusterConfigPath, RemoteTree>(subtreesCount);
@@ -297,9 +355,38 @@ namespace Vostok.ClusterConfig.Client.Updaters
                     var hasSubtree = reader.ReadBool();
                     if (hasSubtree)
                     {
+                        var isPatch = reader.ReadBool();
+                        var isCompressed = reader.ReadBool();
                         var arrayLength = reader.ReadInt32();
                         var segment = new ArraySegment<byte>(reader.Buffer, (int)reader.Position, arrayLength);
-                        subtrees.Add(path, new RemoteTree(protocol, segment, serializer, description));
+                        
+                        if (isCompressed)
+                        {
+                            using var decompressedTreeStream = new MemoryStream(arrayLength);
+                            
+                            using (var treeSegmentStream = new MemoryStream(segment.Array!, segment.Offset, segment.Count))
+                            using (var gzipStream = new GZipStream(treeSegmentStream, CompressionMode.Decompress))
+                            {
+                                gzipStream.CopyTo(decompressedTreeStream);
+                            }
+
+                            if (!decompressedTreeStream.TryGetBuffer(out segment))
+                            {
+                                throw new Exception("Bug in code");
+                            }
+                        }
+
+                        if (isPatch)
+                        {
+                            if (!TryApplyPatch(protocol, segment, lastResult, version, out var newZone, description))
+                            {
+                                return false;
+                            }
+
+                            segment = newZone;
+                        }
+
+                        subtrees.Add(path, new RemoteTree(segment, serializer, description));
                         reader.Position += arrayLength;
                     }
                     else
@@ -316,10 +403,18 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 }
             }
 
-            return new RemoteSubtrees(subtrees);
+            remoteSubtrees = new RemoteSubtrees(subtrees);
+            return true;
         }
 
-        private RemoteUpdateResult CreateResultViaPatch(ClusterConfigProtocolVersion protocol, Response response, DateTime version, Uri replica, RemoteUpdateResult lastResult, ClusterConfigProtocolVersion? recommendedProtocol, string responsesDescriptions)
+        private RemoteUpdateResult CreateResultViaPatch(
+            ClusterConfigProtocolVersion protocol, 
+            Response response, 
+            DateTime version, 
+            Uri replica, 
+            RemoteUpdateResult lastResult, 
+            ClusterConfigProtocolVersion? recommendedProtocol, 
+            string responsesDescriptions)
         {
             if (protocol != ClusterConfigProtocolVersion.V2)
                 throw new RemoteUpdateException($"Received 206 response from server, but it's not supported for current protocol. {responsesDescriptions}.");
@@ -327,37 +422,34 @@ namespace Vostok.ClusterConfig.Client.Updaters
             if (lastResult?.Tree?.Serialized == null)
                 throw new RemoteUpdateException($"Received 206 response from server, but nothing to patch. {responsesDescriptions}.");
 
-            if (protocol != lastResult.Tree.Protocol)
-                throw new RemoteUpdateException($"Received 206 response from server, but can't apply {protocol} patch to {lastResult.Tree.Protocol} tree. {responsesDescriptions}.");
+            if (protocol != lastResult.UsedProtocol)
+                throw new RemoteUpdateException($"Received 206 response from server, but can't apply {protocol} patch to {lastResult.UsedProtocol} tree. {responsesDescriptions}.");
             
-            if (!TryApplyPatch(protocol, response, lastResult, version, out var newZone, responsesDescriptions))
+            if (!TryApplyPatch(protocol, response.Content.ToArraySegment(), lastResult, version, out var newZone, responsesDescriptions))
                 return CreatePatchingFailedResult(lastResult, recommendedProtocol, PatchingFailedReason.ApplyPatchFailed);
 
             if (!EnsureHashValid(newZone, response, version, true, responsesDescriptions))
                 return CreatePatchingFailedResult(lastResult, recommendedProtocol, PatchingFailedReason.HashMismatch);
 
-            var tree = new RemoteTree(protocol, new ArraySegment<byte>(newZone), protocol.GetSerializer(interningCache), GetDescription(response));
+            var tree = new RemoteTree(newZone, protocol.GetSerializer(interningCache), GetDescription(response));
 
-            LogReceivedNewZone(tree, version, replica, true, protocol, responsesDescriptions);
+            LogReceivedNewZone(tree.Size, version, replica, true, protocol, responsesDescriptions);
 
-            // todo (deniaa, 04.10.2024): вообще какая-то дурацкая ситуация, если мы откатились с V3 на V2 и словили патч...
-            // TODO Как будто, коли мы работаем с FullTree, нам наши поддеревья не нужны.
-            // TODO вероятно надо будет переделать, когда полное дерево будем спрашивать и через поддеревья
-            return new RemoteUpdateResult(true, tree, false, null, version, recommendedProtocol, null);
+            return new RemoteUpdateResult(true, tree, false, null, protocol, version, recommendedProtocol, null);
         }
-
-        private bool TryApplyPatch(ClusterConfigProtocolVersion protocol, Response response, RemoteUpdateResult old, DateTime version, out byte[] newZone, string responsesDescriptions)
+        
+        private bool TryApplyPatch(ClusterConfigProtocolVersion protocol, ArraySegment<byte> patch, RemoteUpdateResult old, DateTime version, out ArraySegment<byte> newZone, string responsesDescriptions)
         {
             try
             {
-                newZone = protocol.GetPatcher(interningCache).ApplyPatch(old.Tree!.Serialized!.Value, response.Content.ToArray());
+                newZone = protocol.GetPatcher(interningCache).ApplyPatch(old.Tree!.Serialized!.Value, patch);
                 return true;
             }
             catch (Exception e)
             {
                 log.Error(e, "Can't apply patch {PatchVersion} to {OldVersion} (protocol {Protocol}). {ResponsesDescriptions}.", version, old.Version, protocol, responsesDescriptions);
-                
-                newZone = null;
+
+                newZone = default;
                 return false;
             }
         }
@@ -369,7 +461,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
         private string GetDescription(Response response) => response.Headers[ClusterConfigHeaderNames.TreeDescription];
 
-        private bool EnsureHashValid(byte[] serialized, Response response, DateTime newVersion, bool isPatch, string responsesDescriptions)
+        private bool EnsureHashValid(ArraySegment<byte> serialized, Response response, DateTime newVersion, bool isPatch, string responsesDescriptions)
         {
             var expectedHash = response.Headers[ClusterConfigHeaderNames.ZoneHash];
             if (expectedHash == null)
@@ -407,9 +499,9 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 protocol.ToString(),
                 responsesDescriptions);
 
-        private void LogReceivedNewZone(RemoteTree tree, DateTime version, Uri replica, bool patch, ClusterConfigProtocolVersion protocol, string responsesDescriptions)
+        private void LogReceivedNewZone(int treesSize, DateTime version, Uri replica, bool patch, ClusterConfigProtocolVersion protocol, string responsesDescriptions)
             => log.Info("Received new version of zone '{Zone}' from {Replica}. Size = {Size}. Version = {Version}. Protocol = {Protocol}. Patch = {IsPatch}. {ResponsesDescriptions}.", 
-                zone, replica?.Authority, tree.Size, version.ToString("R"), protocol.ToString(), patch, responsesDescriptions);
+                zone, replica?.Authority, treesSize, version.ToString("R"), protocol.ToString(), patch, responsesDescriptions);
 
         #endregion
 

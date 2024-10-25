@@ -14,23 +14,24 @@ internal class RemoteSubtrees
     
     public Dictionary<ClusterConfigPath, RemoteTree> Subtrees { get; }
 
-    public bool TryGetSettings(ClusterConfigPath path, [CanBeNull] out ISettingsNode result)
+    //TODO (deniaa): tests (on path modification especially)
+    public ISettingsNode GetSettings(ClusterConfigPath path)
     {
-        result = null;
         foreach (var pair in Subtrees)
         {
             var subtreePath = pair.Key;
-            var remoteTree = pair.Value;
             if (!subtreePath.IsPrefixOf(path))
                 continue;
-
-            //TODO (deniaa) кажется это норма, когда remoteTree null. А не буффер в нём. Надо здесь это обработать.
-            //TODO (deniaa) Tests
+            
+            var remoteTree = pair.Value;
+            if (remoteTree == null)
+            {
+                return null;
+            }
             path = path.ToString().Substring(subtreePath.ToString().Length);
-            result = remoteTree.GetSettings(path);
-            return true;
+            return remoteTree.GetSettings(path);
         }
 
-        return false;
+        return null;
     }
 }

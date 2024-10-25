@@ -163,8 +163,6 @@ namespace Vostok.ClusterConfig.Client
         {
             InitiatePeriodicUpdates();
 
-            //TODO плохая ситуация: мы скачали маленькое дерево, запросили дерево побольше, оно вытеснило наше маленькое дерево из subtreesObservingState.
-            //Затем мы снова просим маленькое дерево, находим в subtreesObservingState только большое, и... начинаем его ждать! Хотя ответ у нас уже есть.
             if (subtreesObservingState.TryAddSubtree(clusterConfigPath, out var tcs))
             {
                 immediatelyUpdateTokenSource.Cancel();
