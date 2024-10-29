@@ -38,7 +38,7 @@ internal class SubtreesObservingState
 
         var subtrees = new List<ObservingSubtree>(cachedObservingSubtrees.Count);
         //(deniaa): It's better to do it in the opposite direction, if s[i] is a prefix of s[j], then i > j, so it's easier to not add than to remove.
-        for (var i = cachedObservingSubtrees.Count - 1; i >= 0; i++)
+        for (var i = cachedObservingSubtrees.Count - 1; i >= 0; i--)
         {
             var toAdd = cachedObservingSubtrees[i];
             if (!AlreadyHavePrefix(subtrees, toAdd))
@@ -150,6 +150,10 @@ internal class SubtreesObservingState
             }
 
             observingSubtrees = newSubtrees;
+            //(deniaa): Sinse we have already finalized our subtree of all these nested sub-subtrees and removed all these sub-subtrees,
+            //(deniaa) we have to set their token to unlock waiters.  
+            foreach (var removedSubtree in subtreesToRemove)
+                removedSubtree.AtLeastOnceObtaining.TrySetResult(true);
         }
     }
 

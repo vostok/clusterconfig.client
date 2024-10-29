@@ -152,9 +152,9 @@ namespace Vostok.ClusterConfig.Client
             if (subtreesObservingState.TryAddSubtree(clusterConfigPath, out var tcs))
             {
                 immediatelyUpdateTokenSource.Cancel();
-                tcs.Task.GetAwaiter().GetResult();
             }
             
+            tcs.Task.GetAwaiter().GetResult();
             return stateSource.Task.GetAwaiter().GetResult();
         }
 
@@ -166,9 +166,9 @@ namespace Vostok.ClusterConfig.Client
             if (subtreesObservingState.TryAddSubtree(clusterConfigPath, out var tcs))
             {
                 immediatelyUpdateTokenSource.Cancel();
-                await tcs.Task;
             }
 
+            await tcs.Task;
             return await stateSource.Task;
         }
 
@@ -257,7 +257,8 @@ namespace Vostok.ClusterConfig.Client
                         PropagateNewState(CreateNewState(currentState, localUpdateResult, remoteUpdateResult), cancellationToken);
                     if (observingSubtrees != null)
                     {
-                        //(deniaa): Подумать над версиями в каждой ноде, чтобы отслеживать отсутствие изменений в них более точечно.
+                        //(deniaa): We could make a version for each subtree and change it only if content have changed.
+                        //(deniaa): So as not to do useless changes of unchanged subtree if zone has changed elsewhere.
                         subtreesObservingState.FinalizeSubtrees(observingSubtrees, remoteUpdateResult.Version);
                     }
 
