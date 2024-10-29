@@ -12,14 +12,14 @@ namespace Vostok.ClusterConfig.Client.Tests.Helpers
 {
     [TestFixture(ClusterConfigProtocolVersion.V1)]
     [TestFixture(ClusterConfigProtocolVersion.V2)]
-    internal class TreeExtractor_Tests
+    internal class TreeExtractor_SingleTree_Tests
     {
         private readonly ClusterConfigProtocolVersion protocol;
         private ISettingsNode localTree;
         private ISettingsNode remoteTree;
         private ClusterConfigClientState state;
 
-        public TreeExtractor_Tests(ClusterConfigProtocolVersion protocol) => this.protocol = protocol;
+        public TreeExtractor_SingleTree_Tests(ClusterConfigProtocolVersion protocol) => this.protocol = protocol;
 
         [SetUp]
         public void TestSetup()
@@ -78,6 +78,11 @@ namespace Vostok.ClusterConfig.Client.Tests.Helpers
         [TestCase("/foo/baz")]
         [TestCase("/foo/bar")]
         [TestCase("/foo/bar/baz")]
+        [TestCase("")]
+        [TestCase("foo")]
+        [TestCase("foo/baz")]
+        [TestCase("foo/bar")]
+        [TestCase("foo/bar/baz")]
         public void Should_return_remote_tree_result_when_local_is_null(string path)
         {
             localTree = null;
@@ -133,10 +138,10 @@ namespace Vostok.ClusterConfig.Client.Tests.Helpers
                     var cache = new RecyclingBoundedCache<string, string>(4);
                     protocol.GetSerializer(cache).Serialize(remoteTree, writer);
 
-                    remote = new RemoteTree(protocol, writer.Buffer.Take(writer.Length).ToArray(), protocol.GetSerializer(cache), "Desc");
+                    remote = new RemoteTree(new ArraySegment<byte>(writer.Buffer, 0, writer.Length), protocol.GetSerializer(cache), "Desc");
                 }
 
-                state = new ClusterConfigClientState(localTree, remote, new RecyclingBoundedCache<ClusterConfigPath, ISettingsNode>(10), Int64.MaxValue);
+                state = new ClusterConfigClientState(localTree, remote, null, new RecyclingBoundedCache<ClusterConfigPath, ISettingsNode>(10), Int64.MaxValue);
             }
 
             return TreeExtractor.Extract(state, path, null);

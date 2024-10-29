@@ -8,11 +8,9 @@ using NSubstitute;
 using NUnit.Framework;
 using Vostok.Clusterclient.Core;
 using Vostok.Clusterclient.Core.Model;
-using Vostok.ClusterConfig.Client.Abstractions;
 using Vostok.ClusterConfig.Client.Exceptions;
 using Vostok.ClusterConfig.Client.Helpers;
 using Vostok.ClusterConfig.Client.Updaters;
-using Vostok.ClusterConfig.Core.Serialization;
 using Vostok.Commons.Collections;
 using Vostok.Logging.Abstractions;
 using Vostok.Logging.Console;
@@ -55,8 +53,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
             cancellation = new CancellationTokenSource();
 
             var cache = new RecyclingBoundedCache<string, string>(4);
-            tree1 = new RemoteTree(protocol, Guid.NewGuid().ToByteArray(), protocol.GetSerializer(cache), "T1 Desc");
-            tree2 = new RemoteTree(protocol, Guid.NewGuid().ToByteArray(), protocol.GetSerializer(cache), "T2 Desc");
+            tree1 = new RemoteTree(new ArraySegment<byte>(Guid.NewGuid().ToByteArray()), protocol.GetSerializer(cache), "T1 Desc");
+            tree2 = new RemoteTree(new ArraySegment<byte>(Guid.NewGuid().ToByteArray()), protocol.GetSerializer(cache), "T2 Desc");
 
             version1 = DateTime.UtcNow;
             version1 = new DateTime(version1.Year, version1.Month, version1.Day, version1.Hour, version1.Minute, version1.Second, 0, version1.Kind);
@@ -127,7 +125,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(ClusterResultStatus.ReplicasNotFound);
 
-            Action action = () => Update(new RemoteUpdateResult(false, tree1, version1, null, null));
+            Action action = () => Update(new RemoteUpdateResult(false, tree1, false, null, protocol, version1, null, null));
 
             Console.Out.WriteLine(action.Should().Throw<RemoteUpdateException>().Which);
         }
@@ -140,7 +138,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(status);
 
-            Action action = () => Update(new RemoteUpdateResult(false, tree1, version1, null, null));
+            Action action = () => Update(new RemoteUpdateResult(false, tree1, false, null, protocol, version1, null, null));
 
             Console.Out.WriteLine(action.Should().Throw<RemoteUpdateException>().Which);
         }
@@ -156,7 +154,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
                 ResponseCode.ReceiveFailure,
                 ResponseCode.ServiceUnavailable);
 
-            Action action = () => Update(new RemoteUpdateResult(false, tree1, version1, null, null));
+            Action action = () => Update(new RemoteUpdateResult(false, tree1, false, null, protocol, version1, null, null));
 
             Console.Out.WriteLine(action.Should().Throw<RemoteUpdateException>().Which);
         }
@@ -196,7 +194,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(ResponseCode.NotModified);
 
-            var result = Update(new RemoteUpdateResult(true, tree1, version1, null, null));
+            var result = Update(new RemoteUpdateResult(true, tree1, false, null, protocol, version1, null, null));
 
             result.Changed.Should().BeFalse();
             result.Tree.Should().BeSameAs(tree1);
@@ -228,7 +226,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(tree1.Serialized, version1);
 
-            var result = Update(new RemoteUpdateResult(false, tree2, version2, null, null));
+            var result = Update(new RemoteUpdateResult(false, tree2, false, null, protocol, version2, null, null));
 
             result.Changed.Should().BeFalse();
             result.Tree.Should().BeSameAs(tree2);
@@ -252,7 +250,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(tree2.Serialized, version2);
 
-            var result = Update(new RemoteUpdateResult(false, tree1, version1, null, null));
+            var result = Update(new RemoteUpdateResult(false, tree1, false, null, protocol, version1, null, null));
 
             result.Changed.Should().BeTrue();
             result.Tree?.Serialized.Should().Equal(tree2.Serialized);
@@ -264,7 +262,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(tree2.Serialized, version2);
 
-            var result = Update(new RemoteUpdateResult(false, tree2, version2, null, null));
+            var result = Update(new RemoteUpdateResult(false, tree2, false, null, protocol, version2, null, null));
 
             result.Changed.Should().BeFalse();
             result.Tree?.Serialized.Should().Equal(tree2.Serialized);
@@ -272,10 +270,10 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         }
 
         private RemoteUpdateResult Update(RemoteUpdateResult previous)
-            => enabledUpdater.UpdateAsync(protocol, previous, cancellation.Token).GetAwaiter().GetResult();
+            => enabledUpdater.UpdateAsync(new List<ObservingSubtree>(), protocol, previous, cancellation.Token).GetAwaiter().GetResult();
 
         private RemoteUpdateResult UpdateDisabled(RemoteUpdateResult previous)
-            => disabledUpdater.UpdateAsync(protocol, previous, cancellation.Token).GetAwaiter().GetResult();
+            => disabledUpdater.UpdateAsync(new List<ObservingSubtree>(), protocol, previous, cancellation.Token).GetAwaiter().GetResult();
 
         private void SetupResponse(ClusterResultStatus status, params ResponseCode[] responses)
         {
@@ -291,12 +289,12 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
                 .ReturnsForAnyArgs(new ClusterResult(ClusterResultStatus.Success, new List<ReplicaResult>(), new Response(code), null));
         }
 
-        private void SetupResponse(byte[] content, DateTime? version)
+        private void SetupResponse(ArraySegment<byte>? content, DateTime? version)
         {
             var response = Responses.Ok;
 
             if (content != null)
-                response = response.WithContent(content);
+                response = response.WithContent(content.Value);
 
             if (version.HasValue)
                 response = response.WithHeader(HeaderNames.LastModified, version.Value.ToString("R"));

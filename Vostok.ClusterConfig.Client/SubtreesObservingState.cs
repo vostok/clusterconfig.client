@@ -82,10 +82,10 @@ internal class SubtreesObservingState
                 return false;
             
             //(deniaa): Yes, if we add /a/a/a, then /a/a, then /a, after finalization phase we will have only one /a path.
-            //(deniaa): And here we can harry to set a 
+            //(deniaa): And here we can harry to set the root here.
             if (cachedObservingSubtrees.Count > maxSubtrees)
             {
-                newSubtree = "/";
+                newSubtree = "";
             }
             
             var newSubtrees = new List<ObservingSubtree>(cachedObservingSubtrees.Count + 1);

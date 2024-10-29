@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using JetBrains.Annotations;
 using Vostok.ClusterConfig.Client.Abstractions;
 using Vostok.Configuration.Abstractions.SettingsTree;
@@ -14,7 +15,6 @@ internal class RemoteSubtrees
     
     public Dictionary<ClusterConfigPath, RemoteTree> Subtrees { get; }
 
-    //TODO (deniaa): tests (on path modification especially)
     public ISettingsNode GetSettings(ClusterConfigPath path)
     {
         foreach (var pair in Subtrees)
@@ -28,8 +28,17 @@ internal class RemoteSubtrees
             {
                 return null;
             }
-            path = path.ToString().Substring(subtreePath.ToString().Length);
-            return remoteTree.GetSettings(path);
+
+            var remainingSegments = path.ToString().Substring(subtreePath.ToString().Length);
+            //TODO (deniaa): Replace all Segments with SegmentsAsMemory if it is possible.
+#if NET6_0_OR_GREATER
+            var rootName = path.SegmentsAsMemory.LastOrDefault().ToString();       
+#else
+            var rootName = path.Segments.LastOrDefault();
+#endif
+            if (rootName == string.Empty)
+                rootName = null;
+            return remoteTree.GetSettings(remainingSegments, rootName);
         }
 
         return null;

@@ -49,7 +49,7 @@ namespace Vostok.ClusterConfig.Client.Helpers
         {
             if (state.RemoteTree != null)
             {
-                return state.RemoteTree.GetSettings(path);
+                return state.RemoteTree.GetSettings(path, null);
             }
 
             if (state.RemoteSubtrees != null)

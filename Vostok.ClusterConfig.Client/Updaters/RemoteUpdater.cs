@@ -22,6 +22,7 @@ using Vostok.ClusterConfig.Client.Exceptions;
 using Vostok.ClusterConfig.Client.Helpers;
 using Vostok.ClusterConfig.Core.Http;
 using Vostok.ClusterConfig.Core.Serialization;
+using Vostok.ClusterConfig.Core.Serialization.SubtreesProtocol;
 using Vostok.ClusterConfig.Core.Utils;
 using Vostok.Commons.Binary;
 using Vostok.Commons.Collections;
@@ -190,14 +191,12 @@ namespace Vostok.ClusterConfig.Client.Updaters
         {
             //TODO что-то сделать с размером и\или пулингом.
             var writer = new BinaryBufferWriter(1024);
-            
-            writer.Write(observingSubtrees.Count);
+
+            var request = new List<(string prefix, DateTime? version, bool forceFullUpdate)>(observingSubtrees.Count);
             foreach (var subtree in observingSubtrees)
-            {
-                writer.WriteWithLength(subtree.Path.ToString());
-                writer.WriteNullable(subtree.LastVersion, (bw, time) => bw.Write(time.ToUniversalTime().Ticks));
-                writer.Write(forceFullUpdate);
-            }
+                request.Add((subtree.Path.ToString(), subtree.LastVersion, forceFullUpdate));
+
+            SubtreesRequestSerializer.Serialize(writer, request);
 
             return new Content(writer.Buffer);
         }
@@ -317,18 +316,8 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
             //TODO передавать changed = true для обоих типов дерева как будто не верно
             return new RemoteUpdateResult(true, tree, true, remoteSubtrees, protocol, version, recommendedProtocol, null);
-        }        
+        }
         
-        //(deniaa):
-        //[SubtreesCount (int32)]
-        //    [Prefix + Length (int32 + string_utf8)]
-        //    [WasModified (byte)]
-        //    if (WasModified)
-        //        [HasSubtree (byte)]
-        //        if (HasSubtree) 
-        //            [IsPatch (byte)]
-        //            [IsCompressed (byte)]
-        //            [SerializedTree + Length (int32 + byte_array)]
         private bool TryDeserializeRemoteSubtrees(
             ClusterConfigProtocolVersion protocol,
             Response response,
@@ -338,72 +327,51 @@ namespace Vostok.ClusterConfig.Client.Updaters
             string description,
             out RemoteSubtrees remoteSubtrees)
         {
-            remoteSubtrees = null;
-            
             //(deniaa): Until we override BufferFactory for transport and create a buffer for gzip decompression, each Content is a new byte array. So we can refer to subsequences of it.
             var responseContent = response.Content.ToArraySegment();
             var reader = new BinaryBufferReader(responseContent.Array!, responseContent.Offset);
 
-            var subtreesCount = reader.ReadInt32();
-            var subtrees = new Dictionary<ClusterConfigPath, RemoteTree>(subtreesCount);
-            for (var i = 0; i < subtreesCount; i++)
+            var deserializedSubtrees = SubtreesResponseSerializer.Deserialize(reader, Encoding.UTF8, true);
+            var result = new Dictionary<ClusterConfigPath, RemoteTree>();
+            remoteSubtrees = null;
+            
+            foreach (var pair in deserializedSubtrees)
             {
-                var path = reader.ReadString(Encoding.UTF8);
-                var wasModified = reader.ReadBool();
-                if (wasModified)
+                var prefix = pair.Key;
+                var subtree = pair.Value;
+                
+                if (subtree.WasModified)
                 {
-                    var hasSubtree = reader.ReadBool();
-                    if (hasSubtree)
+                    if (subtree.HasSubtree)
                     {
-                        var isPatch = reader.ReadBool();
-                        var isCompressed = reader.ReadBool();
-                        var arrayLength = reader.ReadInt32();
-                        var segment = new ArraySegment<byte>(reader.Buffer, (int)reader.Position, arrayLength);
-                        
-                        if (isCompressed)
+                        if (subtree.IsPatch)
                         {
-                            using var decompressedTreeStream = new MemoryStream(arrayLength);
-                            
-                            using (var treeSegmentStream = new MemoryStream(segment.Array!, segment.Offset, segment.Count))
-                            using (var gzipStream = new GZipStream(treeSegmentStream, CompressionMode.Decompress))
-                            {
-                                gzipStream.CopyTo(decompressedTreeStream);
-                            }
-
-                            if (!decompressedTreeStream.TryGetBuffer(out segment))
-                            {
-                                throw new Exception("Bug in code");
-                            }
-                        }
-
-                        if (isPatch)
-                        {
-                            if (!TryApplyPatch(protocol, segment, lastResult, version, out var newZone, description))
+                            if (!TryApplyPatch(protocol, subtree.Content, lastResult, version, out var patchedTree, description))
                             {
                                 return false;
                             }
 
-                            segment = newZone;
+                            subtree.Content = patchedTree;
                         }
 
-                        subtrees.Add(path, new RemoteTree(segment, serializer, description));
-                        reader.Position += arrayLength;
+                        result.Add(new ClusterConfigPath(prefix), new RemoteTree(subtree.Content, serializer, description));
                     }
                     else
                     {
-                        subtrees.Add(path, null);
+                        result.Add(new ClusterConfigPath(prefix), null);
                     }
                 }
                 else
                 {
+                    var path = new ClusterConfigPath(prefix);
                     if (lastResult?.Subtrees != null && lastResult.Subtrees.Subtrees.TryGetValue(path, out var previousTree))
                     {
-                        subtrees.Add(path, previousTree);
+                        result.Add(path, previousTree);
                     }
                 }
             }
 
-            remoteSubtrees = new RemoteSubtrees(subtrees);
+            remoteSubtrees = new RemoteSubtrees(result);
             return true;
         }
 

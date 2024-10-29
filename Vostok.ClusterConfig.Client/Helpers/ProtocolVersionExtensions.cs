@@ -29,30 +29,26 @@ namespace Vostok.ClusterConfig.Client.Helpers
             this ClusterConfigProtocolVersion protocol, 
             RecyclingBoundedCache<string, string> interningCache)
         {
-            switch (protocol)
+            return protocol switch
             {
-                case ClusterConfigProtocolVersion.V1:
-                    return TreeSerializerV1;
-                case ClusterConfigProtocolVersion.V2:
-                    return new TreeSerializerV2(interningCache);
-                case var x:
-                    throw new InvalidOperationException($"Unknown protocol version '{x}'");
-            }
+                ClusterConfigProtocolVersion.V1 => TreeSerializerV1,
+                ClusterConfigProtocolVersion.V2 => new TreeSerializerV2(interningCache),
+                ClusterConfigProtocolVersion.V3 => new TreeSerializerV2(interningCache),
+                var x => throw new InvalidOperationException($"Unknown protocol version '{x}'")
+            };
         }
 
         public static IBinaryPatcher GetPatcher(
             this ClusterConfigProtocolVersion protocol, 
             RecyclingBoundedCache<string, string> interningCache)
         {
-            switch (protocol)
+            return protocol switch
             {
-                case ClusterConfigProtocolVersion.V1:
-                    throw new NotSupportedException("Protocol V1 doesn't supports patching");
-                case ClusterConfigProtocolVersion.V2:
-                    return new TreeSerializerV2(interningCache);
-                case var x:
-                    throw new InvalidOperationException($"Unknown protocol version '{x}'");
-            }
+                ClusterConfigProtocolVersion.V1 => throw new NotSupportedException("Protocol V1 doesn't supports patching"),
+                ClusterConfigProtocolVersion.V2 => new TreeSerializerV2(interningCache),
+                ClusterConfigProtocolVersion.V3 => new TreeSerializerV2(interningCache),
+                var x => throw new InvalidOperationException($"Unknown protocol version '{x}'")
+            };
         }
     }
 }

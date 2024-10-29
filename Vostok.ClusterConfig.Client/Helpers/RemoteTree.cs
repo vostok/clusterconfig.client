@@ -27,10 +27,10 @@ namespace Vostok.ClusterConfig.Client.Helpers
         public string Description { get; }
 
         [CanBeNull]
-        public ISettingsNode GetSettings(ClusterConfigPath path)
+        public ISettingsNode GetSettings(ClusterConfigPath path, string rootName)
         {
             var segment = Serialized.Value;
-            return serializer.Deserialize(new BinaryBufferReader(segment.Array, segment.Offset), path.Segments);
+            return serializer.Deserialize(new BinaryBufferReader(segment.Array, segment.Offset), path.Segments, rootName);
         }
     }
 }
