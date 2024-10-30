@@ -14,9 +14,11 @@ namespace Vostok.ClusterConfig.Client;
 /// </summary>
 internal class SubtreesObservingState
 {
-    private readonly TaskCompletionSource<bool> completed = new();
+    private readonly TaskCompletionSource<bool> completedTaskCompletionSource = new();
     private readonly object lockObject = new();
     private readonly int maxSubtrees;
+    
+    private volatile bool cancelled = false;
     
     /// <summary>
     /// Empty = no one subtree is under observation (initial state)
@@ -28,7 +30,7 @@ internal class SubtreesObservingState
     public SubtreesObservingState(int maxSubtrees)
     {
         this.maxSubtrees = maxSubtrees;
-        completed.SetResult(true);
+        completedTaskCompletionSource.SetResult(true);
         observingSubtrees = new List<ObservingSubtree>();
     }
 
@@ -48,6 +50,40 @@ internal class SubtreesObservingState
         return subtrees;
     }
 
+    /// <param name="newSubtree">Path to subtree.</param>
+    /// <param name="taskCompletionSource">Source to indicate was this subtree downloaded at least once</param>
+    /// <returns>Returns True if new subtree was added and need to initiate downloading.</returns>
+    public bool TryAddSubtree(ClusterConfigPath newSubtree, out TaskCompletionSource<bool> taskCompletionSource)
+    {
+        if (cancelled)
+        {
+            taskCompletionSource = completedTaskCompletionSource;
+            return false;
+        }
+
+        var cachedObservingSubtrees = observingSubtrees;
+
+        if (AlreadyUnderObservation(cachedObservingSubtrees, newSubtree, out taskCompletionSource))
+            return false;
+        
+        return TryAddObservingSubtrees(newSubtree, out taskCompletionSource);
+    }
+
+    public void FinalizeSubtrees(List<ObservingSubtree> observingSubtreesToFinalize, DateTime? dateTime)
+    {
+        foreach (var subtreeToFinalize in observingSubtreesToFinalize)
+        {
+            subtreeToFinalize.LastVersion = dateTime;
+            
+            if (subtreeToFinalize.AtLeastOnceObtaining.Task.IsCompleted)
+                continue;
+
+            subtreeToFinalize.AtLeastOnceObtaining.TrySetResult(true);
+
+            CleanupLeafSubtrees(subtreeToFinalize);
+        }
+    }
+
     private static bool AlreadyHavePrefix(List<ObservingSubtree> subtrees, ObservingSubtree toAdd)
     {
         foreach (var subtree in subtrees)
@@ -57,27 +93,20 @@ internal class SubtreesObservingState
         return false;
     }
 
-    /// <param name="newSubtree">Path to subtree.</param>
-    /// <param name="taskCompletionSource">Source to indicate was this subtree downloaded at least once</param>
-    /// <returns>Returns True if new subtree was added and need to initiate downloading.</returns>
-    public bool TryAddSubtree(ClusterConfigPath newSubtree, out TaskCompletionSource<bool> taskCompletionSource)
-    {
-        var cachedObservingSubtrees = observingSubtrees;
-
-        if (AlreadyUnderObservation(cachedObservingSubtrees, newSubtree, out taskCompletionSource))
-            return false;
-        
-        return TryAddObservingSubtrees(newSubtree, out taskCompletionSource);
-    }
-
     private bool TryAddObservingSubtrees(ClusterConfigPath newSubtree, out TaskCompletionSource<bool> taskCompletionSource)
     {
         lock (lockObject)
         {
-            taskCompletionSource = completed;
+            taskCompletionSource = completedTaskCompletionSource;
             var cachedObservingSubtrees = observingSubtrees;
 
-            //(deniaa): It's important to double check it
+            //(deniaa): It's important to double check this
+            if (cancelled)
+            {
+                taskCompletionSource = completedTaskCompletionSource;
+                return false;
+            }
+            //(deniaa): It's important to double check this
             if (AlreadyUnderObservation(cachedObservingSubtrees, newSubtree, out taskCompletionSource))
                 return false;
             
@@ -97,21 +126,6 @@ internal class SubtreesObservingState
 
             taskCompletionSource = newObservingSubtree.AtLeastOnceObtaining;
             return true;
-        }
-    }
-
-    public void FinalizeSubtrees(List<ObservingSubtree> observingSubtreesToFinalize, DateTime dateTime)
-    {
-        foreach (var subtreeToFinalize in observingSubtreesToFinalize)
-        {
-            subtreeToFinalize.LastVersion = dateTime;
-            
-            if (subtreeToFinalize.AtLeastOnceObtaining.Task.IsCompleted)
-                continue;
-
-            subtreeToFinalize.AtLeastOnceObtaining.TrySetResult(true);
-
-            CleanupLeafSubtrees(subtreeToFinalize);
         }
     }
 
@@ -170,5 +184,18 @@ internal class SubtreesObservingState
         }
 
         return false;
+    }
+
+    public void Cancel()
+    {
+        lock (lockObject)
+        {
+            cancelled = true;
+            
+            foreach (var observingSubtree in observingSubtrees)
+            {
+                observingSubtree.AtLeastOnceObtaining.TrySetResult(true);
+            }
+        }
     }
 }

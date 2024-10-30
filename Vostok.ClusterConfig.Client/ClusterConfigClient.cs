@@ -129,6 +129,8 @@ namespace Vostok.ClusterConfig.Client
                 cancellationSource.Cancel();
 
                 PropagateError(new ObjectDisposedException(GetType().Name), true);
+                
+                subtreesObservingState.Cancel();
             }
         }
 
@@ -168,6 +170,7 @@ namespace Vostok.ClusterConfig.Client
                 immediatelyUpdateTokenSource.Cancel();
             }
 
+            //TODO может, оставить только subtrees и при protocol < V3 просто фигачить в subtreesObservingState корень? 
             await tcs.Task.ConfigureAwait(false);
             return await stateSource.Task.ConfigureAwait(false);
         }
@@ -238,10 +241,14 @@ namespace Vostok.ClusterConfig.Client
 
                 var budget = TimeBudget.StartNew(settings.UpdatePeriod);
 
+                if (protocol != ClusterConfigProtocolVersion.V3)
+                    subtreesObservingState.TryAddSubtree(new ClusterConfigPath(""), out _);
+                var observingSubtrees = subtreesObservingState.GetSubtreesToRequest();
+                
                 try
                 {
                     var localUpdateResult = localUpdater.Update(lastLocalResult);
-                    var observingSubtrees = subtreesObservingState.GetSubtreesToRequest();
+                    
                     var remoteUpdateResult = await remoteUpdater.UpdateAsync(observingSubtrees, protocol, lastRemoteResult, cancellationToken).ConfigureAwait(false);
 
                     if (remoteUpdateResult.RecommendedProtocol is {} recommendedProtocol && settings.ForcedProtocolVersion == null)
@@ -274,6 +281,9 @@ namespace Vostok.ClusterConfig.Client
 
                     if (currentState == null)
                         PropagateError(new ClusterConfigClientException("Failure in initial settings update.", error), false);
+                    
+                    if (observingSubtrees != null)
+                        subtreesObservingState.FinalizeSubtrees(observingSubtrees, null);
                 }
 
                 var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, immediatelyUpdateTokenSource.Token);
