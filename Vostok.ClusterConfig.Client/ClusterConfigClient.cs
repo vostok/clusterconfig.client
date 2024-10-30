@@ -168,8 +168,8 @@ namespace Vostok.ClusterConfig.Client
                 immediatelyUpdateTokenSource.Cancel();
             }
 
-            await tcs.Task;
-            return await stateSource.Task;
+            await tcs.Task.ConfigureAwait(false);
+            return await stateSource.Task.ConfigureAwait(false);
         }
 
         [NotNull]
