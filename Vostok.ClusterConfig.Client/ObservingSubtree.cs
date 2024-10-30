@@ -9,7 +9,7 @@ internal class ObservingSubtree
     public ObservingSubtree(ClusterConfigPath path)
     {
         Path = path;
-        AtLeastOnceObtaining = new TaskCompletionSource<bool>();
+        AtLeastOnceObtaining = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         LastVersion = null;
     }
 
