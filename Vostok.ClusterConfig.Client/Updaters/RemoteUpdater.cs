@@ -292,30 +292,26 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
             var serializer = protocol.GetSerializer(interningCache);
             var description = GetDescription(response);
-            
-            RemoteSubtrees remoteSubtrees = null;
-            RemoteTree tree = null;
-            int treesSize;
+
             if (protocol == ClusterConfigProtocolVersion.V3)
             {
                 //(deniaa): Only patch applying can fail deserialization
-                if (!TryDeserializeRemoteSubtrees(protocol, response, version, lastResult, serializer, description, out remoteSubtrees))
+                if (!TryDeserializeRemoteSubtrees(protocol, response, version, lastResult, serializer, description, out var remoteSubtrees))
                 {
                     return CreatePatchingFailedResult(lastResult, recommendedProtocol, PatchingFailedReason.ApplyPatchFailed);
                 }
                 
-                treesSize = remoteSubtrees.Subtrees.Sum(x => x.Value.Size);
+                var treesSize = remoteSubtrees.Subtrees.Sum(x => x.Value.Size);
+
+                LogReceivedNewSubtrees(treesSize, version, replica, protocol, responsesDescriptions);
+                return new RemoteUpdateResult(false, null, true, remoteSubtrees, protocol, version, recommendedProtocol, null);
             }
             else
             {
-                tree = new RemoteTree(new ArraySegment<byte>(response.Content.ToArray()), serializer, description);
-                treesSize = tree.Size;
+                var tree = new RemoteTree(new ArraySegment<byte>(response.Content.ToArray()), serializer, description);
+                LogReceivedNewZone(tree.Size, version, replica, false, protocol, responsesDescriptions);
+                return new RemoteUpdateResult(true, tree, false, null, protocol, version, recommendedProtocol, null);
             }
-
-            LogReceivedNewZone(treesSize, version, replica, false, protocol, responsesDescriptions);
-
-            //TODO передавать changed = true для обоих типов дерева как будто не верно
-            return new RemoteUpdateResult(true, tree, true, remoteSubtrees, protocol, version, recommendedProtocol, null);
         }
         
         private bool TryDeserializeRemoteSubtrees(
@@ -467,9 +463,13 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 protocol.ToString(),
                 responsesDescriptions);
 
-        private void LogReceivedNewZone(int treesSize, DateTime version, Uri replica, bool patch, ClusterConfigProtocolVersion protocol, string responsesDescriptions)
+        private void LogReceivedNewZone(int treeSize, DateTime version, Uri replica, bool patch, ClusterConfigProtocolVersion protocol, string responsesDescriptions)
             => log.Info("Received new version of zone '{Zone}' from {Replica}. Size = {Size}. Version = {Version}. Protocol = {Protocol}. Patch = {IsPatch}. {ResponsesDescriptions}.", 
-                zone, replica?.Authority, treesSize, version.ToString("R"), protocol.ToString(), patch, responsesDescriptions);
+                zone, replica?.Authority, treeSize, version.ToString("R"), protocol.ToString(), patch, responsesDescriptions);
+        
+        private void LogReceivedNewSubtrees(int treesSize, DateTime version, Uri replica, ClusterConfigProtocolVersion protocol, string responsesDescriptions)
+            => log.Info("Received new subtrees from '{Zone}' from {Replica}. Size = {Size}. Version = {Version}. Protocol = {Protocol}. {ResponsesDescriptions}.", 
+                zone, replica?.Authority, treesSize, version.ToString("R"), protocol.ToString(), responsesDescriptions);
 
         #endregion
 
