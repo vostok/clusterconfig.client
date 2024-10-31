@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -198,7 +196,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
             SubtreesRequestSerializer.Serialize(writer, request);
 
-            return new Content(writer.Buffer);
+            return new Content(writer.Buffer, 0, (int)writer.Position);
         }
 
         [CanBeNull]
@@ -262,7 +260,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             
             var version = DateTime.Parse(response.Headers.LastModified, null, DateTimeStyles.AssumeUniversal).ToUniversalTime();
 
-            if (lastUpdateResult != null && version <= lastUpdateResult.Version)
+            if (lastUpdateResult != null && version <= lastUpdateResult.Version && protocol < ClusterConfigProtocolVersion.V3)
             {
                 if (version < lastUpdateResult.Version)
                     LogStaleVersion(version, lastUpdateResult.Version, protocol, responsesDescriptions);
@@ -295,16 +293,23 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
             if (protocol == ClusterConfigProtocolVersion.V3)
             {
+                //(deniaa): Until we override BufferFactory for transport and create a buffer for gzip decompression, each Content is a new byte array. So we can refer to subsequences of it.
+                var responseContent = response.Content.ToArraySegment();
+                var reader = new BinaryBufferReader(responseContent.Array!, responseContent.Offset);
+
+                var deserializedSubtrees = SubtreesResponseSerializer.Deserialize(reader, Encoding.UTF8, true);
+                
                 //(deniaa): Only patch applying can fail deserialization
-                if (!TryDeserializeRemoteSubtrees(protocol, response, version, lastResult, serializer, description, out var remoteSubtrees))
+                if (!TryDeserializeRemoteSubtrees(protocol, deserializedSubtrees, version, lastResult, serializer, description, out var remoteSubtrees))
                 {
                     return CreatePatchingFailedResult(lastResult, recommendedProtocol, PatchingFailedReason.ApplyPatchFailed);
                 }
-                
-                var treesSize = remoteSubtrees.Subtrees.Sum(x => x.Value.Size);
+
+                var haveAnyModifiedSubtree = deserializedSubtrees.Any(s => s.Value.WasModified);
+                var treesSize = remoteSubtrees.Subtrees.Sum(x => x.Value?.Size ?? 0);
 
                 LogReceivedNewSubtrees(treesSize, version, replica, protocol, responsesDescriptions);
-                return new RemoteUpdateResult(false, null, true, remoteSubtrees, protocol, version, recommendedProtocol, null);
+                return new RemoteUpdateResult(false, null, haveAnyModifiedSubtree, haveAnyModifiedSubtree ? remoteSubtrees : null, protocol, version, recommendedProtocol, null);
             }
             else
             {
@@ -316,18 +321,13 @@ namespace Vostok.ClusterConfig.Client.Updaters
         
         private bool TryDeserializeRemoteSubtrees(
             ClusterConfigProtocolVersion protocol,
-            Response response,
+            Dictionary<string, Subtree> deserializedSubtrees,
             DateTime version,
             RemoteUpdateResult lastResult,
             ITreeSerializer serializer,
             string description,
             out RemoteSubtrees remoteSubtrees)
         {
-            //(deniaa): Until we override BufferFactory for transport and create a buffer for gzip decompression, each Content is a new byte array. So we can refer to subsequences of it.
-            var responseContent = response.Content.ToArraySegment();
-            var reader = new BinaryBufferReader(responseContent.Array!, responseContent.Offset);
-
-            var deserializedSubtrees = SubtreesResponseSerializer.Deserialize(reader, Encoding.UTF8, true);
             var result = new Dictionary<ClusterConfigPath, RemoteTree>();
             remoteSubtrees = null;
             

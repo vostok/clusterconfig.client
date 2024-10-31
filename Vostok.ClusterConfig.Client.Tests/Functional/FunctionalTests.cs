@@ -24,6 +24,7 @@ using Vostok.Logging.Console;
 
 namespace Vostok.ClusterConfig.Client.Tests.Functional
 {
+    //TODO test V3
     [TestFixture(ClusterConfigProtocolVersion.V1)]
     [TestFixture(ClusterConfigProtocolVersion.V2)]
     internal class FunctionalTests

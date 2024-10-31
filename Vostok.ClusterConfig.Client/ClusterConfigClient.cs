@@ -11,7 +11,6 @@ using Vostok.Commons.Collections;
 using Vostok.Commons.Helpers.Observable;
 using Vostok.Commons.Threading;
 using Vostok.Commons.Time;
-using Vostok.Configuration.Abstractions.Merging;
 using Vostok.Configuration.Abstractions.SettingsTree;
 using Vostok.Configuration.Sources.Extensions.Observable;
 using Vostok.Logging.Abstractions;
@@ -38,7 +37,7 @@ namespace Vostok.ClusterConfig.Client
 
         private volatile TaskCompletionSource<ClusterConfigClientState> stateSource;
         private volatile CachingObservable<ClusterConfigClientState> stateObservable;
-        private volatile CancellationTokenSource immediatelyUpdateTokenSource;
+        private volatile TaskCompletionSource<bool> immediatelyUpdateCompletionSource;
 
         /// <summary>
         /// Creates a new instance of <see cref="ClusterConfigClient"/> with given <paramref name="settings"/> merged with default settings from <see cref="DefaultSettingsProvider"/> (non-default user settings take priority).
@@ -55,7 +54,7 @@ namespace Vostok.ClusterConfig.Client
             cancellationSource = new CancellationTokenSource();
             observablePropagationLock = new object();
             internedValuesCache = settings.InternedValuesCacheCapacity > 0 ? new RecyclingBoundedCache<string, string>(settings.InternedValuesCacheCapacity) : null;
-            immediatelyUpdateTokenSource = new CancellationTokenSource();
+            immediatelyUpdateCompletionSource = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             subtreesObservingState = new SubtreesObservingState(this.settings.MaximumSubtrees);
         }
 
@@ -153,7 +152,7 @@ namespace Vostok.ClusterConfig.Client
 
             if (subtreesObservingState.TryAddSubtree(clusterConfigPath, out var tcs))
             {
-                immediatelyUpdateTokenSource.Cancel();
+                immediatelyUpdateCompletionSource.TrySetResult(true);
             }
             
             tcs.Task.GetAwaiter().GetResult();
@@ -167,7 +166,7 @@ namespace Vostok.ClusterConfig.Client
 
             if (subtreesObservingState.TryAddSubtree(clusterConfigPath, out var tcs))
             {
-                immediatelyUpdateTokenSource.Cancel();
+                immediatelyUpdateCompletionSource.TrySetResult(true);
             }
 
             //TODO может, оставить только subtrees и при protocol < V3 просто фигачить в subtreesObservingState корень? 
@@ -182,7 +181,7 @@ namespace Vostok.ClusterConfig.Client
 
             if (subtreesObservingState.TryAddSubtree(clusterConfigPath, out var tcs))
             {
-                immediatelyUpdateTokenSource.Cancel();
+                immediatelyUpdateCompletionSource.TrySetResult(true);
                 //(deniaa): Compare with ObtainStateAsync method here we will not wait for the first settings from server for given path.
                 //(deniaa): It's an observable and it will notify subscribers when a value is recieved.
                 //(deniaa): So here we just cancel token to force the update.  
@@ -233,10 +232,10 @@ namespace Vostok.ClusterConfig.Client
 
             while (!cancellationToken.IsCancellationRequested)
             {
-                //(deniaa): Главное возвести его до того, как сходим в сервер.
-                //(deniaa): Если его возведут до похода в сервер, то в худшем случае мы просто лишний раз (ещё раз) сходим в сервер.
-                //(deniaa): Если его возведут до этой строчки и мы его перетрём - ничего страшного, ведь мы и так пошли в сервер, т.е. делаем то, что от нас хотели.
-                immediatelyUpdateTokenSource = new CancellationTokenSource();
+                //(deniaa): The main idea is to setup thi TCS before we go to backend.
+                //(deniaa): If it is set up before going to backend then in the worst case we will just fo to the backend one more time.
+                //(deniaa): If it is set up before this line and we wipe that source - it's OK, we will immediately go to backend anyway.
+                immediatelyUpdateCompletionSource = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 var currentState = GetCurrentState();
 
                 var budget = TimeBudget.StartNew(settings.UpdatePeriod);
@@ -244,11 +243,11 @@ namespace Vostok.ClusterConfig.Client
                 if (protocol != ClusterConfigProtocolVersion.V3)
                     subtreesObservingState.TryAddSubtree(new ClusterConfigPath(""), out _);
                 var observingSubtrees = subtreesObservingState.GetSubtreesToRequest();
-                
+
                 try
                 {
                     var localUpdateResult = localUpdater.Update(lastLocalResult);
-                    
+
                     var remoteUpdateResult = await remoteUpdater.UpdateAsync(observingSubtrees, protocol, lastRemoteResult, cancellationToken).ConfigureAwait(false);
 
                     if (remoteUpdateResult.RecommendedProtocol is {} recommendedProtocol && settings.ForcedProtocolVersion == null)
@@ -281,13 +280,12 @@ namespace Vostok.ClusterConfig.Client
 
                     if (currentState == null)
                         PropagateError(new ClusterConfigClientException("Failure in initial settings update.", error), false);
-                    
+
                     if (observingSubtrees != null)
                         subtreesObservingState.FinalizeSubtrees(observingSubtrees, null);
                 }
 
-                var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, immediatelyUpdateTokenSource.Token);
-                await Task.Delay(budget.Remaining, linkedSource.Token).ConfigureAwait(false);
+                await Task.WhenAny(Task.Delay(budget.Remaining, cancellationToken), immediatelyUpdateCompletionSource.Task).ConfigureAwait(false);
             }
         }
 
