@@ -166,12 +166,16 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
         private Request CreateRequest(List<ObservingSubtree> observingSubtrees, ClusterConfigProtocolVersion protocol, DateTime? lastVersion, bool protocolChanged, PatchingFailedReason? patchingFailedReason)
         {
-            var request = Request.Get(protocol.GetUrlPath())
+            var withContent = protocol == ClusterConfigProtocolVersion.V3 && observingSubtrees != null;
+            var urlPath = protocol.GetUrlPath();
+            var request = withContent ? Request.Post(urlPath) : Request.Get(urlPath);
+                
+            request = request
                 .WithAdditionalQueryParameter("zoneName", zone)
                 .WithAcceptHeader("application/octet-stream")
                 .WithAcceptEncodingHeader("gzip");
 
-            if (protocol == ClusterConfigProtocolVersion.V3 && observingSubtrees != null)
+            if (withContent)
                 request = request.WithContent(SerializeRequest(observingSubtrees, patchingFailedReason != null || protocolChanged));
 
             if (protocol < ClusterConfigProtocolVersion.V3 && lastVersion.HasValue)
@@ -190,9 +194,9 @@ namespace Vostok.ClusterConfig.Client.Updaters
             //TODO что-то сделать с размером и\или пулингом.
             var writer = new BinaryBufferWriter(1024);
 
-            var request = new List<(string prefix, DateTime? version, bool forceFullUpdate)>(observingSubtrees.Count);
+            var request = new List<SubtreeRequest>(observingSubtrees.Count);
             foreach (var subtree in observingSubtrees)
-                request.Add((subtree.Path.ToString(), subtree.LastVersion, forceFullUpdate));
+                request.Add(new SubtreeRequest(subtree.Path.ToString(), subtree.LastVersion, forceFullUpdate));
 
             SubtreesRequestSerializer.Serialize(writer, request);
 
@@ -338,7 +342,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 
                 if (subtree.WasModified)
                 {
-                    if (subtree.HasSubtree)
+                    if (subtree.SubtreeExists)
                     {
                         if (subtree.IsPatch)
                         {

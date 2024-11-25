@@ -25,22 +25,22 @@ internal class SubtreesObservingState
     /// 1+ ObservingSubtrees = common situation (intermediate and normal state) 
     /// Single ObservingSubtree with empty ("") path = downgraded to full tree downloading (terminal state).
     /// </summary>
-    [NotNull] private List<ObservingSubtree> observingSubtrees;
+    [NotNull] private ObservingSubtree[] observingSubtrees;
     
     public SubtreesObservingState(int maxSubtrees)
     {
         this.maxSubtrees = maxSubtrees;
         completedTaskCompletionSource.SetResult(true);
-        observingSubtrees = new List<ObservingSubtree>();
+        observingSubtrees = Array.Empty<ObservingSubtree>();
     }
 
     public List<ObservingSubtree> GetSubtreesToRequest()
     {
         var cachedObservingSubtrees = observingSubtrees;
 
-        var subtrees = new List<ObservingSubtree>(cachedObservingSubtrees.Count);
+        var subtrees = new List<ObservingSubtree>(cachedObservingSubtrees.Length);
         //(deniaa): It's better to do it in the opposite direction, if s[i] is a prefix of s[j], then i > j, so it's easier to not add than to remove.
-        for (var i = cachedObservingSubtrees.Count - 1; i >= 0; i--)
+        for (var i = cachedObservingSubtrees.Length - 1; i >= 0; i--)
         {
             var toAdd = cachedObservingSubtrees[i];
             if (!AlreadyHavePrefix(subtrees, toAdd))
@@ -69,7 +69,7 @@ internal class SubtreesObservingState
         return TryAddObservingSubtrees(newSubtree, out taskCompletionSource);
     }
 
-    public void FinalizeSubtrees(List<ObservingSubtree> observingSubtreesToFinalize, DateTime? dateTime)
+    public void FinalizeSubtrees(IEnumerable<ObservingSubtree> observingSubtreesToFinalize, DateTime? dateTime)
     {
         foreach (var subtreeToFinalize in observingSubtreesToFinalize)
         {
@@ -84,7 +84,7 @@ internal class SubtreesObservingState
         }
     }
 
-    private static bool AlreadyHavePrefix(List<ObservingSubtree> subtrees, ObservingSubtree toAdd)
+    private static bool AlreadyHavePrefix(IEnumerable<ObservingSubtree> subtrees, ObservingSubtree toAdd)
     {
         foreach (var subtree in subtrees)
             if (subtree.Path.IsPrefixOf(toAdd.Path))
@@ -112,15 +112,15 @@ internal class SubtreesObservingState
             
             //(deniaa): Yes, if we add /a/a/a, then /a/a, then /a, after finalization phase we will have only one /a path.
             //(deniaa): And here we can harry to set the root here.
-            if (cachedObservingSubtrees.Count >= maxSubtrees)
+            if (cachedObservingSubtrees.Length >= maxSubtrees)
             {
                 newSubtree = "";
             }
             
-            var newSubtrees = new List<ObservingSubtree>(cachedObservingSubtrees.Count + 1);
-            newSubtrees.AddRange(cachedObservingSubtrees);
+            var newSubtrees = new ObservingSubtree[cachedObservingSubtrees.Length + 1];
+            Array.Copy(cachedObservingSubtrees, newSubtrees, cachedObservingSubtrees.Length);
             var newObservingSubtree = new ObservingSubtree(newSubtree);
-            newSubtrees.Add(newObservingSubtree);
+            newSubtrees[cachedObservingSubtrees.Length] = newObservingSubtree;
             
             observingSubtrees = newSubtrees;
 
@@ -155,23 +155,27 @@ internal class SubtreesObservingState
             if (subtreesToRemove == null)
                 return;
 
-            var newSubtrees = new List<ObservingSubtree>(cachedObservingSubtrees.Count - subtreesToRemove.Count);
+            var newSubtrees = new ObservingSubtree[cachedObservingSubtrees.Length - subtreesToRemove.Count];
 
+            var index = 0;
             foreach (var observingSubtree in cachedObservingSubtrees)
             {
                 if (!subtreesToRemove.Contains(observingSubtree))
-                    newSubtrees.Add(observingSubtree);
+                {
+                    newSubtrees[index] = observingSubtree;
+                    index++;
+                }
             }
 
             observingSubtrees = newSubtrees;
-            //(deniaa): Sinse we have already finalized our subtree of all these nested sub-subtrees and removed all these sub-subtrees,
+            //(deniaa): Since we have already finalized our subtree of all these nested sub-subtrees and removed all these sub-subtrees,
             //(deniaa) we have to set their token to unlock waiters.  
             foreach (var removedSubtree in subtreesToRemove)
                 removedSubtree.AtLeastOnceObtaining.TrySetResult(true);
         }
     }
 
-    private static bool AlreadyUnderObservation([NotNull] List<ObservingSubtree> observingSubtrees, ClusterConfigPath newSubtree, out TaskCompletionSource<bool> taskCompletionSource)
+    private static bool AlreadyUnderObservation([NotNull] ObservingSubtree[] observingSubtrees, ClusterConfigPath newSubtree, out TaskCompletionSource<bool> taskCompletionSource)
     {
         taskCompletionSource = null;
         

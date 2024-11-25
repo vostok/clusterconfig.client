@@ -232,8 +232,8 @@ namespace Vostok.ClusterConfig.Client
 
             while (!cancellationToken.IsCancellationRequested)
             {
-                //(deniaa): The main idea is to setup thi TCS before we go to backend.
-                //(deniaa): If it is set up before going to backend then in the worst case we will just fo to the backend one more time.
+                //(deniaa): The main idea is to setup this TCS before we go to backend.
+                //(deniaa): If it is set up before going to backend then in the worst case we will just go to the backend one more time.
                 //(deniaa): If it is set up before this line and we wipe that source - it's OK, we will immediately go to backend anyway.
                 immediatelyUpdateCompletionSource = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 var currentState = GetCurrentState();
