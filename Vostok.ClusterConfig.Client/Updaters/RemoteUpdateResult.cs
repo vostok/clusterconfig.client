@@ -12,19 +12,17 @@ namespace Vostok.ClusterConfig.Client.Updaters
     internal class RemoteUpdateResult
     {
         public RemoteUpdateResult(
-            bool changedFullTree,
-            [CanBeNull] RemoteTree fullTree,
-            bool changedSubtrees,
+            bool changed,
             [CanBeNull] RemoteSubtrees subtrees,
+            [CanBeNull] string description,
             ClusterConfigProtocolVersion? usedProtocol,
             DateTime version,
             ClusterConfigProtocolVersion? recommendedProtocol,
             PatchingFailedReason? patchingFailedReason)
         {
-            Changed = changedFullTree;
-            Tree = fullTree;
-            ChangedSubtrees = changedSubtrees;
+            Changed = changed;
             Subtrees = subtrees;
+            Description = description;
             Version = version;
             RecommendedProtocol = recommendedProtocol;
             PatchingFailedReason = patchingFailedReason;
@@ -34,12 +32,10 @@ namespace Vostok.ClusterConfig.Client.Updaters
         public bool Changed { get; }
 
         [CanBeNull]
-        public RemoteTree Tree { get; }
-
-        public bool ChangedSubtrees { get; }
+        public RemoteSubtrees Subtrees { get; }
         
         [CanBeNull]
-        public RemoteSubtrees Subtrees { get; }
+        public string Description { get; }
         
         public ClusterConfigProtocolVersion? UsedProtocol { get; }
 

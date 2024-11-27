@@ -140,13 +140,13 @@ internal class TreeExtractor_Subtrees_Tests
                 var dictionary = new Dictionary<ClusterConfigPath, RemoteTree>();
                 foreach (var pair in map.Where(p => observingSubtrees.Contains(p.Key)))
                 {
-                    dictionary[new ClusterConfigPath(pair.Key)] = new RemoteTree(pair.Value, treeSerializer, "Desc");
+                    dictionary[new ClusterConfigPath(pair.Key)] = new RemoteTree(pair.Value, treeSerializer);
                 }
 
                 remoteSubtrees = new RemoteSubtrees(dictionary);
             }
 
-            state = new ClusterConfigClientState(localTree, null, remoteSubtrees, new RecyclingBoundedCache<ClusterConfigPath, ISettingsNode>(10), Int64.MaxValue);
+            state = new ClusterConfigClientState(localTree, remoteSubtrees, new RecyclingBoundedCache<ClusterConfigPath, ISettingsNode>(10), Int64.MaxValue);
         }
 
         return TreeExtractor.Extract(state, path, null);

@@ -39,29 +39,31 @@ namespace Vostok.ClusterConfig.Client.Helpers
                     return tree.ScopeTo(path.Segments.Skip(prefix.Segments.Count()));
             }
 
-            var remoteSettings = GetRemoteSettings(state, path);
+            var remoteSettings = state.RemoteSubtrees?.GetSettings(path);
             var localSettings = state.LocalTree?.ScopeTo(path.Segments);
 
             return SettingsNodeMerger.Merge(remoteSettings, localSettings, mergeOptions);
         }
 
-        private static ISettingsNode GetRemoteSettings(ClusterConfigClientState state, ClusterConfigPath path)
-        {
-            if (state.RemoteTree != null)
-            {
-                return state.RemoteTree.GetSettings(path, null);
-            }
-
-            if (state.RemoteSubtrees != null)
-            {
-                return state.RemoteSubtrees.GetSettings(path);
-            }
-
-            return null;
-        }
-
         private static IEnumerable<ClusterConfigPath> EnumeratePrefixes(ClusterConfigPath path)
         {
+#if NET6_0_OR_GREATER
+            var segments = path.SegmentsAsMemory;
+            var builder = new StringBuilder();
+
+            var first = true;
+            foreach (var segment in segments)
+            {
+                if (!first)
+                    builder.Append(ClusterConfigPath.Separator);
+
+                first = false;
+                builder.Append(segment);
+
+                yield return builder.ToString();
+            }
+            
+#else
             var segments = path.Segments.ToArray();
             var builder = new StringBuilder();
 
@@ -74,6 +76,7 @@ namespace Vostok.ClusterConfig.Client.Helpers
 
                 yield return builder.ToString();
             }
+#endif
         }
     }
 }

@@ -10,13 +10,11 @@ namespace Vostok.ClusterConfig.Client
     {
         public ClusterConfigClientState(
             [CanBeNull] ISettingsNode localTree, 
-            [CanBeNull] RemoteTree remoteTree, 
             [CanBeNull] RemoteSubtrees remoteSubtrees, 
             [NotNull] RecyclingBoundedCache<ClusterConfigPath, ISettingsNode> cache, 
             long version)
         {
             LocalTree = localTree;
-            RemoteTree = remoteTree;
             RemoteSubtrees = remoteSubtrees;
             Cache = cache;
             Version = version;
@@ -24,9 +22,6 @@ namespace Vostok.ClusterConfig.Client
 
         [CanBeNull]
         public ISettingsNode LocalTree { get; }
-
-        [CanBeNull]
-        public RemoteTree RemoteTree { get; }
 
         [CanBeNull]
         public RemoteSubtrees RemoteSubtrees { get; }

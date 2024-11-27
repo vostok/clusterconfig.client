@@ -11,10 +11,9 @@ namespace Vostok.ClusterConfig.Client.Helpers
     {
         private readonly ITreeSerializer serializer;
 
-        public RemoteTree(ArraySegment<byte>? serialized, ITreeSerializer serializer, [CanBeNull] string description)
+        public RemoteTree(ArraySegment<byte>? serialized, ITreeSerializer serializer)
         {
             Serialized = serialized;
-            Description = description;
 
             this.serializer = serializer;
         }
@@ -22,9 +21,6 @@ namespace Vostok.ClusterConfig.Client.Helpers
         public int Size => Serialized?.Count ?? 0;
         
         public ArraySegment<byte>? Serialized { get; }
-        
-        [CanBeNull]
-        public string Description { get; }
 
         [CanBeNull]
         public ISettingsNode GetSettings(ClusterConfigPath path, string rootName)

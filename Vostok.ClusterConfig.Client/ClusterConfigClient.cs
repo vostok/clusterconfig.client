@@ -169,7 +169,6 @@ namespace Vostok.ClusterConfig.Client
                 immediatelyUpdateCompletionSource.TrySetResult(true);
             }
 
-            //TODO может, оставить только subtrees и при protocol < V3 просто фигачить в subtreesObservingState корень? 
             await tcs.Task.ConfigureAwait(false);
             return await stateSource.Task.ConfigureAwait(false);
         }
@@ -259,7 +258,7 @@ namespace Vostok.ClusterConfig.Client
                         }
                     }
 
-                    if (currentState == null || localUpdateResult.Changed || remoteUpdateResult.Changed || remoteUpdateResult.ChangedSubtrees)
+                    if (currentState == null || localUpdateResult.Changed || remoteUpdateResult.Changed || remoteUpdateResult.Changed)
                         PropagateNewState(CreateNewState(currentState, localUpdateResult, remoteUpdateResult), cancellationToken);
                     if (observingSubtrees != null)
                     {
@@ -334,8 +333,7 @@ namespace Vostok.ClusterConfig.Client
             [NotNull] RemoteUpdateResult remoteUpdateResult)
         {
             var newLocalTree = localUpdateResult.Changed ? localUpdateResult.Tree : oldState?.LocalTree;
-            var newRemoteTree = remoteUpdateResult.Changed ? remoteUpdateResult.Tree : oldState?.RemoteTree;
-            var newRemoteSubtrees = remoteUpdateResult.ChangedSubtrees ? remoteUpdateResult.Subtrees : oldState?.RemoteSubtrees;
+            var newRemoteSubtrees = remoteUpdateResult.Changed ? remoteUpdateResult.Subtrees : oldState?.RemoteSubtrees;
             var newCaches = new RecyclingBoundedCache<ClusterConfigPath, ISettingsNode>(settings.CacheCapacity);
             var newVersion = (oldState?.Version ?? 0L) + 1;
             
@@ -344,7 +342,7 @@ namespace Vostok.ClusterConfig.Client
                     ? remoteUpdateResult.Version.Ticks
                     : newVersion;
 
-            return new ClusterConfigClientState(newLocalTree, newRemoteTree, newRemoteSubtrees, newCaches, newVersion);
+            return new ClusterConfigClientState(newLocalTree, newRemoteSubtrees, newCaches, newVersion);
         }
 
         private void PropagateNewState([NotNull] ClusterConfigClientState state, CancellationToken cancellationToken)

@@ -15,12 +15,17 @@ internal class RemoteSubtrees
     
     public Dictionary<ClusterConfigPath, RemoteTree> Subtrees { get; }
 
+    public static RemoteSubtrees FromSingleFullTree(RemoteTree singleFullTree)
+    {
+        return new RemoteSubtrees(new Dictionary<ClusterConfigPath, RemoteTree> {{new ClusterConfigPath("/"), singleFullTree}});
+    }
+
     public ISettingsNode GetSettings(ClusterConfigPath path)
     {
         foreach (var pair in Subtrees)
         {
             var subtreePath = pair.Key;
-            if (!subtreePath.IsPrefixOf(path))
+            if (!path.TryScopeTo(subtreePath, out var remainingPath))
                 continue;
             
             var remoteTree = pair.Value;
@@ -29,7 +34,6 @@ internal class RemoteSubtrees
                 return null;
             }
 
-            var remainingSegments = path.ToString().Substring(subtreePath.ToString().Length);
             //TODO (deniaa): Replace all Segments with SegmentsAsMemory if it is possible.
 #if NET6_0_OR_GREATER
             var rootName = path.SegmentsAsMemory.LastOrDefault().ToString();       
@@ -38,7 +42,7 @@ internal class RemoteSubtrees
 #endif
             if (rootName == string.Empty)
                 rootName = null;
-            return remoteTree.GetSettings(remainingSegments, rootName);
+            return remoteTree.GetSettings(remainingPath, rootName);
         }
 
         return null;

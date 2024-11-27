@@ -23,6 +23,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
     [TestFixture(ClusterConfigProtocolVersion.V2)]
     internal class RemoteUpdater_Tests
     {
+        private const string T1Desc = "T1 Desc";
+        private const string T2Desc = "T2 Desc";
         private readonly ClusterConfigProtocolVersion protocol;
         private IClusterClient client;
         private ILog log;
@@ -53,8 +55,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
             cancellation = new CancellationTokenSource();
 
             var cache = new RecyclingBoundedCache<string, string>(4);
-            tree1 = new RemoteTree(new ArraySegment<byte>(Guid.NewGuid().ToByteArray()), protocol.GetSerializer(cache), "T1 Desc");
-            tree2 = new RemoteTree(new ArraySegment<byte>(Guid.NewGuid().ToByteArray()), protocol.GetSerializer(cache), "T2 Desc");
+            tree1 = new RemoteTree(new ArraySegment<byte>(Guid.NewGuid().ToByteArray()), protocol.GetSerializer(cache));
+            tree2 = new RemoteTree(new ArraySegment<byte>(Guid.NewGuid().ToByteArray()), protocol.GetSerializer(cache));
 
             version1 = DateTime.UtcNow;
             version1 = new DateTime(version1.Year, version1.Month, version1.Day, version1.Hour, version1.Minute, version1.Second, 0, version1.Kind);
@@ -73,7 +75,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
             var result = UpdateDisabled(null);
 
             result.Changed.Should().BeTrue();
-            result.Tree.Should().BeNull();
+            result.Subtrees.Should().BeNull();
             result.Version.Should().Be(DateTime.MinValue);
         }
 
@@ -85,12 +87,12 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
             result = UpdateDisabled(result);
 
             result.Changed.Should().BeFalse();
-            result.Tree.Should().BeNull();
+            result.Subtrees.Should().BeNull();
 
             result = UpdateDisabled(result);
 
             result.Changed.Should().BeFalse();
-            result.Tree.Should().BeNull();
+            result.Subtrees.Should().BeNull();
         }
 
         [Test]
@@ -112,11 +114,11 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
             var result2 = Update(result1);
 
             result1.Changed.Should().BeTrue();
-            result1.Tree.Should().BeNull();
+            result1.Subtrees.Should().BeNull();
             result1.Version.Should().Be(DateTime.MinValue);
 
             result2.Changed.Should().BeFalse();
-            result2.Tree.Should().BeNull();
+            result2.Subtrees.Should().BeNull();
             result2.Version.Should().Be(DateTime.MinValue);
         }
 
@@ -125,7 +127,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(ClusterResultStatus.ReplicasNotFound);
 
-            Action action = () => Update(new RemoteUpdateResult(false, tree1, false, null, protocol, version1, null, null));
+            Action action = () => Update(new RemoteUpdateResult(false, RemoteSubtrees.FromSingleFullTree(tree1), T1Desc, protocol, version1, null, null));
 
             Console.Out.WriteLine(action.Should().Throw<RemoteUpdateException>().Which);
         }
@@ -138,7 +140,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(status);
 
-            Action action = () => Update(new RemoteUpdateResult(false, tree1, false, null, protocol, version1, null, null));
+            Action action = () => Update(new RemoteUpdateResult(false, RemoteSubtrees.FromSingleFullTree(tree1), T1Desc, protocol, version1, null, null));
 
             Console.Out.WriteLine(action.Should().Throw<RemoteUpdateException>().Which);
         }
@@ -154,7 +156,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
                 ResponseCode.ReceiveFailure,
                 ResponseCode.ServiceUnavailable);
 
-            Action action = () => Update(new RemoteUpdateResult(false, tree1, false, null, protocol, version1, null, null));
+            Action action = () => Update(new RemoteUpdateResult(false, RemoteSubtrees.FromSingleFullTree(tree1), T1Desc, protocol, version1, null, null));
 
             Console.Out.WriteLine(action.Should().Throw<RemoteUpdateException>().Which);
         }
@@ -171,11 +173,11 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
             var result2 = Update(result1);
 
             result1.Changed.Should().BeTrue();
-            result1.Tree.Should().BeNull();
+            result1.Subtrees.Should().BeNull();
             result1.Version.Should().Be(DateTime.MinValue);
 
             result2.Changed.Should().BeFalse();
-            result2.Tree.Should().BeNull();
+            result2.Subtrees.Should().BeNull();
             result2.Version.Should().Be(DateTime.MinValue);
         }
 
@@ -194,10 +196,12 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(ResponseCode.NotModified);
 
-            var result = Update(new RemoteUpdateResult(true, tree1, false, null, protocol, version1, null, null));
+            var result = Update(new RemoteUpdateResult(true, RemoteSubtrees.FromSingleFullTree(tree1), T1Desc, protocol, version1, null, null));
 
             result.Changed.Should().BeFalse();
-            result.Tree.Should().BeSameAs(tree1);
+            result.Subtrees.Should().NotBeNull();
+            result.Subtrees!.Subtrees.Should().HaveCount(1);
+            result.Subtrees!.Subtrees.Single().Value.Should().BeSameAs(tree1);
             result.Version.Should().Be(version1);
         }
 
@@ -226,10 +230,12 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(tree1.Serialized, version1);
 
-            var result = Update(new RemoteUpdateResult(false, tree2, false, null, protocol, version2, null, null));
+            var result = Update(new RemoteUpdateResult(false, RemoteSubtrees.FromSingleFullTree(tree2), T2Desc, protocol, version2, null, null));
 
             result.Changed.Should().BeFalse();
-            result.Tree.Should().BeSameAs(tree2);
+            result.Subtrees.Should().NotBeNull();
+            result.Subtrees!.Subtrees.Should().HaveCount(1);
+            result.Subtrees!.Subtrees.Single().Value.Should().BeSameAs(tree2);
             result.Version.Should().Be(version2);
         }
 
@@ -241,7 +247,11 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
             var result = Update(null);
 
             result.Changed.Should().BeTrue();
-            result.Tree?.Serialized.Should().Equal(tree1.Serialized);
+            
+            result.Subtrees.Should().NotBeNull();
+            result.Subtrees!.Subtrees.Should().HaveCount(1);
+            result.Subtrees!.Subtrees.Single().Value.Serialized.Should().Equal(tree1.Serialized);
+            
             result.Version.Should().Be(version1);
         }
 
@@ -250,10 +260,14 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(tree2.Serialized, version2);
 
-            var result = Update(new RemoteUpdateResult(false, tree1, false, null, protocol, version1, null, null));
+            var result = Update(new RemoteUpdateResult(false, RemoteSubtrees.FromSingleFullTree(tree1), T1Desc, protocol, version1, null, null));
 
             result.Changed.Should().BeTrue();
-            result.Tree?.Serialized.Should().Equal(tree2.Serialized);
+            
+            result.Subtrees.Should().NotBeNull();
+            result.Subtrees!.Subtrees.Should().HaveCount(1);
+            result.Subtrees!.Subtrees.Single().Value.Serialized.Should().Equal(tree2.Serialized);
+            
             result.Version.Should().Be(version2);
         }
 
@@ -262,10 +276,14 @@ namespace Vostok.ClusterConfig.Client.Tests.Updaters
         {
             SetupResponse(tree2.Serialized, version2);
 
-            var result = Update(new RemoteUpdateResult(false, tree2, false, null, protocol, version2, null, null));
+            var result = Update(new RemoteUpdateResult(false, RemoteSubtrees.FromSingleFullTree(tree2), T2Desc, protocol, version2, null, null));
 
             result.Changed.Should().BeFalse();
-            result.Tree?.Serialized.Should().Equal(tree2.Serialized);
+            
+            result.Subtrees.Should().NotBeNull();
+            result.Subtrees!.Subtrees.Should().HaveCount(1);
+            result.Subtrees!.Subtrees.Single().Value.Serialized.Should().Equal(tree2.Serialized);
+            
             result.Version.Should().Be(version2);
         }
 

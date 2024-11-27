@@ -138,10 +138,10 @@ namespace Vostok.ClusterConfig.Client.Tests.Helpers
                     var cache = new RecyclingBoundedCache<string, string>(4);
                     protocol.GetSerializer(cache).Serialize(remoteTree, writer);
 
-                    remote = new RemoteTree(new ArraySegment<byte>(writer.Buffer, 0, writer.Length), protocol.GetSerializer(cache), "Desc");
+                    remote = new RemoteTree(new ArraySegment<byte>(writer.Buffer, 0, writer.Length), protocol.GetSerializer(cache));
                 }
 
-                state = new ClusterConfigClientState(localTree, remote, null, new RecyclingBoundedCache<ClusterConfigPath, ISettingsNode>(10), Int64.MaxValue);
+                state = new ClusterConfigClientState(localTree, RemoteSubtrees.FromSingleFullTree(remote), new RecyclingBoundedCache<ClusterConfigPath, ISettingsNode>(10), Int64.MaxValue);
             }
 
             return TreeExtractor.Extract(state, path, null);

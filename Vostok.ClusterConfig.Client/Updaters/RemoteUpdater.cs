@@ -143,8 +143,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             => new(
                 lastResult?.Version != EmptyResultVersion, 
                 null, 
-                lastResult?.Version != EmptyResultVersion, 
-                null, 
+                lastResult?.Description,
                 lastResult?.UsedProtocol, 
                 lastResult?.Version ?? EmptyResultVersion, 
                 lastResult?.RecommendedProtocol, 
@@ -154,11 +153,10 @@ namespace Vostok.ClusterConfig.Client.Updaters
             [CanBeNull] RemoteUpdateResult lastResult, 
             ClusterConfigProtocolVersion? recommendedProtocol, 
             PatchingFailedReason reason)
-            => new(
-                false, 
-                lastResult?.Tree, 
+            => new( 
                 false, 
                 lastResult?.Subtrees, 
+                lastResult?.Description,
                 lastResult?.UsedProtocol, 
                 lastResult?.Version ?? EmptyResultVersion, 
                 recommendedProtocol, 
@@ -191,12 +189,12 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
         private static Content SerializeRequest(List<ObservingSubtree> observingSubtrees, bool forceFullUpdate)
         {
-            //TODO что-то сделать с размером и\или пулингом.
+            //TODO (deniaa): Initial capacity of 1024 was chosen randomly. Need to choose it consciously or pool them.
             var writer = new BinaryBufferWriter(1024);
 
             var request = new List<SubtreeRequest>(observingSubtrees.Count);
             foreach (var subtree in observingSubtrees)
-                request.Add(new SubtreeRequest(subtree.Path.ToString(), subtree.LastVersion, forceFullUpdate));
+                request.Add(new SubtreeRequest(subtree.Path.GetNormalizedPath(), subtree.LastVersion, forceFullUpdate));
 
             SubtreesRequestSerializer.Serialize(writer, request);
 
@@ -213,7 +211,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
                     // (iloktionov): we just silently assume CC is not deployed in current environment and return empty settings.
 
                     // (tsup): We make assumptions above in case we are not forced to assume that cluster config is deployed.
-                    if (lastUpdateResult?.Tree == null && lastUpdateResult?.Subtrees == null && !assumeClusterConfigDeployed)
+                    if (lastUpdateResult?.Subtrees == null && !assumeClusterConfigDeployed)
                     {
                         if (lastUpdateResult == null)
                             LogAssumingNoServer();
@@ -247,7 +245,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             if (lastUpdateResult == null)
                 throw UnexpectedNotModifiedResponseException();
 
-            return new RemoteUpdateResult(false, lastUpdateResult.Tree, false, lastUpdateResult.Subtrees, protocol, lastUpdateResult.Version, GetRecommendedProtocolVersion(response), lastUpdateResult.PatchingFailedReason);
+            return new RemoteUpdateResult(false, lastUpdateResult.Subtrees, lastUpdateResult.Description, protocol, lastUpdateResult.Version, GetRecommendedProtocolVersion(response), lastUpdateResult.PatchingFailedReason);
         }
 
         [NotNull]
@@ -260,7 +258,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 throw new RemoteUpdateException("Expected full zone (because protocol changed), but received patch.");
 
             var recommendedProtocol = GetRecommendedProtocolVersion(response);
-            var responsesDescriptions = $"Responses descriptions: {{previous:{lastUpdateResult?.Tree?.Description}, current:{GetDescription(response)}}}";
+            var responsesDescriptions = $"Responses descriptions: {{previous:{lastUpdateResult?.Description}, current:{GetDescription(response)}}}";
             
             var version = DateTime.Parse(response.Headers.LastModified, null, DateTimeStyles.AssumeUniversal).ToUniversalTime();
 
@@ -269,7 +267,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 if (version < lastUpdateResult.Version)
                     LogStaleVersion(version, lastUpdateResult.Version, protocol, responsesDescriptions);
 
-                return new RemoteUpdateResult(false, lastUpdateResult.Tree, false, lastUpdateResult.Subtrees, protocol, lastUpdateResult.Version, recommendedProtocol, lastUpdateResult.PatchingFailedReason);
+                return new RemoteUpdateResult(false, lastUpdateResult.Subtrees, lastUpdateResult.Description, protocol, lastUpdateResult.Version, recommendedProtocol, lastUpdateResult.PatchingFailedReason);
             }
 
             return response.Code switch
@@ -313,13 +311,15 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 var treesSize = remoteSubtrees.Subtrees.Sum(x => x.Value?.Size ?? 0);
 
                 LogReceivedNewSubtrees(treesSize, version, replica, protocol, responsesDescriptions);
-                return new RemoteUpdateResult(false, null, haveAnyModifiedSubtree, haveAnyModifiedSubtree ? remoteSubtrees : null, protocol, version, recommendedProtocol, null);
+                return new RemoteUpdateResult(haveAnyModifiedSubtree, haveAnyModifiedSubtree ? remoteSubtrees : null, description, protocol, version, recommendedProtocol, null);
             }
             else
             {
-                var tree = new RemoteTree(new ArraySegment<byte>(response.Content.ToArray()), serializer, description);
+                var tree = new RemoteTree(new ArraySegment<byte>(response.Content.ToArray()), serializer);
+                var subtreesFromSingleTree = RemoteSubtrees.FromSingleFullTree(tree);
                 LogReceivedNewZone(tree.Size, version, replica, false, protocol, responsesDescriptions);
-                return new RemoteUpdateResult(true, tree, false, null, protocol, version, recommendedProtocol, null);
+
+                return new RemoteUpdateResult(true, subtreesFromSingleTree, description, protocol, version, recommendedProtocol, null);
             }
         }
         
@@ -346,7 +346,8 @@ namespace Vostok.ClusterConfig.Client.Updaters
                     {
                         if (subtree.IsPatch)
                         {
-                            if (!TryApplyPatch(protocol, subtree.Content, lastResult, version, out var patchedTree, description))
+                            var oldTree = lastResult!.Subtrees!.Subtrees.FirstOrDefault(s => s.Key.Equivalent(new ClusterConfigPath(prefix))).Value!;
+                            if (!TryApplyPatch(protocol, subtree.Content, version, oldTree, lastResult.Version, out var patchedTree, description))
                             {
                                 return false;
                             }
@@ -354,7 +355,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
                             subtree.Content = patchedTree;
                         }
 
-                        result.Add(new ClusterConfigPath(prefix), new RemoteTree(subtree.Content, serializer, description));
+                        result.Add(new ClusterConfigPath(prefix), new RemoteTree(subtree.Content, serializer));
                     }
                     else
                     {
@@ -386,36 +387,37 @@ namespace Vostok.ClusterConfig.Client.Updaters
         {
             if (protocol != ClusterConfigProtocolVersion.V2)
                 throw new RemoteUpdateException($"Received 206 response from server, but it's not supported for current protocol. {responsesDescriptions}.");
-            
-            if (lastResult?.Tree?.Serialized == null)
+
+            var oldSingleTree = lastResult?.Subtrees?.Subtrees.Single().Value;
+            if (oldSingleTree?.Serialized == null)
                 throw new RemoteUpdateException($"Received 206 response from server, but nothing to patch. {responsesDescriptions}.");
 
             if (protocol != lastResult.UsedProtocol)
                 throw new RemoteUpdateException($"Received 206 response from server, but can't apply {protocol} patch to {lastResult.UsedProtocol} tree. {responsesDescriptions}.");
             
-            if (!TryApplyPatch(protocol, response.Content.ToArraySegment(), lastResult, version, out var newZone, responsesDescriptions))
+            if (!TryApplyPatch(protocol, response.Content.ToArraySegment(), version, oldSingleTree, lastResult.Version, out var newZone, responsesDescriptions))
                 return CreatePatchingFailedResult(lastResult, recommendedProtocol, PatchingFailedReason.ApplyPatchFailed);
 
             if (!EnsureHashValid(newZone, response, version, true, responsesDescriptions))
                 return CreatePatchingFailedResult(lastResult, recommendedProtocol, PatchingFailedReason.HashMismatch);
 
-            var tree = new RemoteTree(newZone, protocol.GetSerializer(interningCache), GetDescription(response));
+            var tree = new RemoteTree(newZone, protocol.GetSerializer(interningCache));
 
             LogReceivedNewZone(tree.Size, version, replica, true, protocol, responsesDescriptions);
 
-            return new RemoteUpdateResult(true, tree, false, null, protocol, version, recommendedProtocol, null);
+            return new RemoteUpdateResult(true, RemoteSubtrees.FromSingleFullTree(tree), GetDescription(response), protocol, version, recommendedProtocol, null);
         }
         
-        private bool TryApplyPatch(ClusterConfigProtocolVersion protocol, ArraySegment<byte> patch, RemoteUpdateResult old, DateTime version, out ArraySegment<byte> newZone, string responsesDescriptions)
+        private bool TryApplyPatch(ClusterConfigProtocolVersion protocol, ArraySegment<byte> patch, DateTime version, RemoteTree old, DateTime oldVersion, out ArraySegment<byte> newZone, string responsesDescriptions)
         {
             try
             {
-                newZone = protocol.GetPatcher(interningCache).ApplyPatch(old.Tree!.Serialized!.Value, patch);
+                newZone = protocol.GetPatcher(interningCache).ApplyPatch(old.Serialized!.Value, patch);
                 return true;
             }
             catch (Exception e)
             {
-                log.Error(e, "Can't apply patch {PatchVersion} to {OldVersion} (protocol {Protocol}). {ResponsesDescriptions}.", version, old.Version, protocol, responsesDescriptions);
+                log.Error(e, "Can't apply patch {PatchVersion} to {OldVersion} (protocol {Protocol}). {ResponsesDescriptions}.", version, oldVersion, protocol, responsesDescriptions);
 
                 newZone = default;
                 return false;
