@@ -258,7 +258,7 @@ namespace Vostok.ClusterConfig.Client
                         }
                     }
 
-                    if (currentState == null || localUpdateResult.Changed || remoteUpdateResult.Changed || remoteUpdateResult.Changed)
+                    if (currentState == null || localUpdateResult.Changed || remoteUpdateResult.Changed)
                         PropagateNewState(CreateNewState(currentState, localUpdateResult, remoteUpdateResult), cancellationToken);
                     if (observingSubtrees != null)
                     {

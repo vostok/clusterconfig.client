@@ -311,7 +311,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 var treesSize = remoteSubtrees.Subtrees.Sum(x => x.Value?.Size ?? 0);
 
                 LogReceivedNewSubtrees(treesSize, version, replica, protocol, responsesDescriptions);
-                return new RemoteUpdateResult(haveAnyModifiedSubtree, haveAnyModifiedSubtree ? remoteSubtrees : null, description, protocol, version, recommendedProtocol, null);
+                return new RemoteUpdateResult(haveAnyModifiedSubtree, haveAnyModifiedSubtree ? remoteSubtrees : lastResult.Subtrees, description, protocol, version, recommendedProtocol, null);
             }
             else
             {
