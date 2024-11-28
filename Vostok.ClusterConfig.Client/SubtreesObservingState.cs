@@ -34,6 +34,7 @@ internal class SubtreesObservingState
         observingSubtrees = Array.Empty<ObservingSubtree>();
     }
 
+    [NotNull] 
     public List<ObservingSubtree> GetSubtreesToRequest()
     {
         var cachedObservingSubtrees = observingSubtrees;

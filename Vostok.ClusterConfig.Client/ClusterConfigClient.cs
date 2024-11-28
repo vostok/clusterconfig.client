@@ -260,12 +260,10 @@ namespace Vostok.ClusterConfig.Client
 
                     if (currentState == null || localUpdateResult.Changed || remoteUpdateResult.Changed)
                         PropagateNewState(CreateNewState(currentState, localUpdateResult, remoteUpdateResult), cancellationToken);
-                    if (observingSubtrees != null)
-                    {
-                        //(deniaa): We could make a version for each subtree and change it only if content have changed.
-                        //(deniaa): So as not to do useless changes of unchanged subtree if zone has changed elsewhere.
-                        subtreesObservingState.FinalizeSubtrees(observingSubtrees, remoteUpdateResult.Version);
-                    }
+
+                    //(deniaa): We could make a version for each subtree and change it only if content have changed.
+                    //(deniaa): So as not to do useless changes of unchanged subtree if zone has changed elsewhere.
+                    subtreesObservingState.FinalizeSubtrees(observingSubtrees, remoteUpdateResult.Version);
 
                     lastLocalResult = localUpdateResult;
                     lastRemoteResult = remoteUpdateResult;

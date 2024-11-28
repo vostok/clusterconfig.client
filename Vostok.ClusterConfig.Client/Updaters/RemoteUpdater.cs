@@ -164,7 +164,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
         private Request CreateRequest(List<ObservingSubtree> observingSubtrees, ClusterConfigProtocolVersion protocol, DateTime? lastVersion, bool protocolChanged, PatchingFailedReason? patchingFailedReason)
         {
-            var withContent = protocol == ClusterConfigProtocolVersion.V3 && observingSubtrees != null;
+            var withContent = protocol == ClusterConfigProtocolVersion.V3;
             var urlPath = protocol.GetUrlPath();
             var request = withContent ? Request.Post(urlPath) : Request.Get(urlPath);
                 
