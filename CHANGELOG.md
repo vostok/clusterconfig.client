@@ -1,3 +1,7 @@
+## 0.2.22 (20-11-2024):
+
+Update ClusterClient libraries
+
 ## 0.2.20 (05-08-2023):
 
 Add options to intern string values after deserialization
