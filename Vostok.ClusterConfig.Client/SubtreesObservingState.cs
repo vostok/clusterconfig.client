@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 using Vostok.ClusterConfig.Client.Abstractions;
+using Vostok.Commons.Helpers.Observable;
 
 namespace Vostok.ClusterConfig.Client;
 
@@ -53,24 +54,32 @@ internal class SubtreesObservingState
 
     /// <param name="newSubtree">Path to subtree.</param>
     /// <param name="taskCompletionSource">Source to indicate was this subtree downloaded at least once</param>
+    /// <param name="stateObservable">Is null if State is cancelled</param>
     /// <returns>Returns True if new subtree was added and need to initiate downloading.</returns>
-    public bool TryAddSubtree(ClusterConfigPath newSubtree, out TaskCompletionSource<bool> taskCompletionSource)
+    public bool TryAddSubtree(
+        ClusterConfigPath newSubtree, 
+        out TaskCompletionSource<bool> taskCompletionSource,
+        out CachingObservable<ClusterConfigClientState> stateObservable)
     {
         if (cancelled)
         {
             taskCompletionSource = completedTaskCompletionSource;
+            stateObservable = null;
             return false;
         }
 
         var cachedObservingSubtrees = observingSubtrees;
 
-        if (AlreadyUnderObservation(cachedObservingSubtrees, newSubtree, out taskCompletionSource))
+        if (AlreadyUnderObservation(cachedObservingSubtrees, newSubtree, out taskCompletionSource, out stateObservable))
             return false;
         
-        return TryAddObservingSubtrees(newSubtree, out taskCompletionSource);
+        return TryAddObservingSubtrees(newSubtree, out taskCompletionSource, out stateObservable);
     }
 
-    public void FinalizeSubtrees(IEnumerable<ObservingSubtree> observingSubtreesToFinalize, DateTime? dateTime)
+    public void FinalizeSubtrees(
+        IEnumerable<ObservingSubtree> observingSubtreesToFinalize, 
+        DateTime? dateTime, 
+        CachingObservable<ClusterConfigClientState> cachingObservable)
     {
         foreach (var subtreeToFinalize in observingSubtreesToFinalize)
         {
@@ -79,9 +88,9 @@ internal class SubtreesObservingState
             if (subtreeToFinalize.AtLeastOnceObtaining.Task.IsCompleted)
                 continue;
 
-            subtreeToFinalize.AtLeastOnceObtaining.TrySetResult(true);
+            subtreeToFinalize.FinalizeSubtree(cachingObservable);
 
-            CleanupLeafSubtrees(subtreeToFinalize);
+            CleanupLeafSubtrees(subtreeToFinalize, cachingObservable);
         }
     }
 
@@ -94,11 +103,16 @@ internal class SubtreesObservingState
         return false;
     }
 
-    private bool TryAddObservingSubtrees(ClusterConfigPath newSubtree, out TaskCompletionSource<bool> taskCompletionSource)
+    private bool TryAddObservingSubtrees(
+        ClusterConfigPath newSubtree, 
+        out TaskCompletionSource<bool> taskCompletionSource, 
+        out CachingObservable<ClusterConfigClientState> stateObservable)
     {
         lock (lockObject)
         {
             taskCompletionSource = completedTaskCompletionSource;
+            stateObservable = null;
+            
             var cachedObservingSubtrees = observingSubtrees;
 
             //(deniaa): It's important to double check this
@@ -108,7 +122,7 @@ internal class SubtreesObservingState
                 return false;
             }
             //(deniaa): It's important to double check this
-            if (AlreadyUnderObservation(cachedObservingSubtrees, newSubtree, out taskCompletionSource))
+            if (AlreadyUnderObservation(cachedObservingSubtrees, newSubtree, out taskCompletionSource, out stateObservable))
                 return false;
             
             //(deniaa): Yes, if we add /a/a/a, then /a/a, then /a, after finalization phase we will have only one /a path.
@@ -126,11 +140,12 @@ internal class SubtreesObservingState
             observingSubtrees = newSubtrees;
 
             taskCompletionSource = newObservingSubtree.AtLeastOnceObtaining;
+            stateObservable = newObservingSubtree.SubtreeStateObservable;
             return true;
         }
     }
 
-    private void CleanupLeafSubtrees(ObservingSubtree finalizedSubtree)
+    private void CleanupLeafSubtrees(ObservingSubtree finalizedSubtree, CachingObservable<ClusterConfigClientState> cachingObservable)
     {
         //(deniaa): No LINQ code under lock please!
         lock (lockObject)
@@ -172,26 +187,32 @@ internal class SubtreesObservingState
             //(deniaa): Since we have already finalized our subtree of all these nested sub-subtrees and removed all these sub-subtrees,
             //(deniaa) we have to set their token to unlock waiters.  
             foreach (var removedSubtree in subtreesToRemove)
-                removedSubtree.AtLeastOnceObtaining.TrySetResult(true);
+                removedSubtree.FinalizeSubtree(cachingObservable);
         }
     }
 
-    private static bool AlreadyUnderObservation([NotNull] ObservingSubtree[] observingSubtrees, ClusterConfigPath newSubtree, out TaskCompletionSource<bool> taskCompletionSource)
+    private static bool AlreadyUnderObservation(
+        [NotNull] ObservingSubtree[] observingSubtrees, 
+        ClusterConfigPath newSubtree, 
+        out TaskCompletionSource<bool> taskCompletionSource,
+        out CachingObservable<ClusterConfigClientState> stateObservable)
     {
         taskCompletionSource = null;
+        stateObservable = null;
         
         foreach (var observingSubtree in observingSubtrees)
         {
             if (!observingSubtree.Path.IsPrefixOf(newSubtree))
                 continue;
             taskCompletionSource = observingSubtree.AtLeastOnceObtaining;
+            stateObservable = observingSubtree.SubtreeStateObservable;
             return true;
         }
 
         return false;
     }
 
-    public void Cancel()
+    public void Cancel(CachingObservable<ClusterConfigClientState> cachingObservable)
     {
         lock (lockObject)
         {
@@ -199,7 +220,7 @@ internal class SubtreesObservingState
             
             foreach (var observingSubtree in observingSubtrees)
             {
-                observingSubtree.AtLeastOnceObtaining.TrySetResult(true);
+                observingSubtree.FinalizeSubtree(cachingObservable);
             }
         }
     }

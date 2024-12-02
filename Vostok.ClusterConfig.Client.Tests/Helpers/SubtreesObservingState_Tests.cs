@@ -3,8 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using FluentAssertions;
+using FluentAssertions.Extensions;
 using NUnit.Framework;
 using Vostok.ClusterConfig.Client.Abstractions;
+using Vostok.Commons.Collections;
+using Vostok.Commons.Helpers.Observable;
+using Vostok.Commons.Testing;
+using Vostok.Commons.Testing.Observable;
+using Vostok.Configuration.Abstractions.SettingsTree;
 
 namespace Vostok.ClusterConfig.Client.Tests.Helpers;
 
@@ -13,12 +19,17 @@ public class SubtreesObservingState_Tests
 {
     private int maxSubtrees;
     private SubtreesObservingState state;
+    private CachingObservable<ClusterConfigClientState> observable;
+    private ClusterConfigClientState result;
 
     [SetUp]
     public void SetUp()
     {
         maxSubtrees = 30;
         state = new SubtreesObservingState(maxSubtrees);
+        result = new ClusterConfigClientState(null, null, new RecyclingBoundedCache<ClusterConfigPath, ISettingsNode>(3), 44);
+        observable = new CachingObservable<ClusterConfigClientState>();
+        observable.Next(result);
     }
     
     [Test]
@@ -26,16 +37,21 @@ public class SubtreesObservingState_Tests
     {
         var path = new ClusterConfigPath("foo/bar");
         
-        state.TryAddSubtree(path, out var tcs).Should().BeTrue();
+        state.TryAddSubtree(path, out var tcs, out var cachingObservable).Should().BeTrue();
         tcs.Task.IsCompleted.Should().BeFalse();
 
         var subtreesToRequest = state.GetSubtreesToRequest();
         tcs.Task.IsCompleted.Should().BeFalse();
         subtreesToRequest.Single().Path.Should().Be(path);
+
+        var obs = new TestObserver<ClusterConfigClientState>();
+        cachingObservable.Subscribe(obs);
+        new Action(() => obs.Values.LastOrDefault().Should().BeNull()).ShouldPassIn(10.Seconds());
         
-        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow);
+        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, observable);
         tcs.Task.IsCompleted.Should().BeTrue();
         tcs.Task.GetAwaiter().GetResult().Should().BeTrue();
+        new Action(() => obs.Values.LastOrDefault().Should().Be(result)).ShouldPassIn(10.Seconds());
     }
     
     [Test]
@@ -43,17 +59,20 @@ public class SubtreesObservingState_Tests
     {
         var path = new ClusterConfigPath("foo/bar");
         
-        state.TryAddSubtree(path, out var tcs).Should().BeTrue();
+        state.TryAddSubtree(path, out var tcs, out _).Should().BeTrue();
         var subtreesToRequest = state.GetSubtreesToRequest();
-        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow);
+        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, observable);
         tcs.Task.IsCompleted.Should().BeTrue();
         tcs.Task.GetAwaiter().GetResult().Should().BeTrue();
 
         for (var i = 0; i < 10; i++)
         {
-            state.TryAddSubtree(path, out tcs).Should().BeFalse();
+            state.TryAddSubtree(path, out tcs, out var newCachingObservable).Should().BeFalse();
             tcs.Task.IsCompleted.Should().BeTrue();
             tcs.Task.GetAwaiter().GetResult().Should().BeTrue();
+            var obs = new TestObserver<ClusterConfigClientState>();
+            newCachingObservable.Subscribe(obs);
+            new Action(() => obs.Values.LastOrDefault().Should().Be(result)).ShouldPassIn(10.Seconds());
         }
     }
     
@@ -63,12 +82,13 @@ public class SubtreesObservingState_Tests
         var path = new ClusterConfigPath("foo/bar");
         var nestedPath = new ClusterConfigPath("foo/bar/baz");
         
-        state.TryAddSubtree(path, out var tcs).Should().BeTrue();
+        state.TryAddSubtree(path, out var tcs, out var cachingObservable).Should().BeTrue();
         tcs.Task.IsCompleted.Should().BeFalse();
-        state.TryAddSubtree(nestedPath, out var nestedTcs).Should().BeFalse();
+        state.TryAddSubtree(nestedPath, out var nestedTcs, out var nestedCachingObservable).Should().BeFalse();
         nestedTcs.Task.IsCompleted.Should().BeFalse();
         //(deniaa): Due to current realization they are just the same object it that case.
         ReferenceEquals(tcs, nestedTcs).Should().BeTrue();
+        ReferenceEquals(cachingObservable, nestedCachingObservable).Should().BeTrue();
 
         var subtreesToRequest = state.GetSubtreesToRequest();
         tcs.Task.IsCompleted.Should().BeFalse();
@@ -76,10 +96,19 @@ public class SubtreesObservingState_Tests
         
         subtreesToRequest.Single().Path.Should().Be(path);
         
-        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow);
+        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, observable);
         
         tcs.Task.IsCompleted.Should().BeTrue();
         nestedTcs.Task.IsCompleted.Should().BeTrue();
+        var obs = new TestObserver<ClusterConfigClientState>();
+        cachingObservable.Subscribe(obs);
+        var nestedObs = new TestObserver<ClusterConfigClientState>();
+        nestedCachingObservable.Subscribe(nestedObs);
+        new Action(() =>
+        {
+            obs.Values.LastOrDefault().Should().Be(result);
+            nestedObs.Values.LastOrDefault().Should().Be(result);
+        }).ShouldPassIn(10.Seconds());
     }
     
     [Test]
@@ -88,12 +117,13 @@ public class SubtreesObservingState_Tests
         var path = new ClusterConfigPath("foo/bar");
         var nestedPath = new ClusterConfigPath("foo/bar/baz");
         
-        state.TryAddSubtree(nestedPath, out var nestedTcs).Should().BeTrue();
+        state.TryAddSubtree(nestedPath, out var nestedTcs, out var nestedCachingObservable).Should().BeTrue();
         nestedTcs.Task.IsCompleted.Should().BeFalse();
-        state.TryAddSubtree(path, out var tcs).Should().BeTrue();
+        state.TryAddSubtree(path, out var tcs, out var cachingObservable).Should().BeTrue();
         tcs.Task.IsCompleted.Should().BeFalse();
         //(deniaa): Due to current realization they are both should stay in state with different TCS's it that case.
         ReferenceEquals(tcs, nestedTcs).Should().BeFalse();
+        ReferenceEquals(nestedCachingObservable, cachingObservable).Should().BeFalse();
 
         var subtreesToRequest = state.GetSubtreesToRequest();
         tcs.Task.IsCompleted.Should().BeFalse();
@@ -101,10 +131,20 @@ public class SubtreesObservingState_Tests
         
         subtreesToRequest.Single().Path.Should().Be(path);
         
-        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow);
+        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, observable);
         
         tcs.Task.IsCompleted.Should().BeTrue();
         nestedTcs.Task.IsCompleted.Should().BeTrue();
+
+        var obs = new TestObserver<ClusterConfigClientState>();
+        cachingObservable.Subscribe(obs);
+        var nestedObs = new TestObserver<ClusterConfigClientState>();
+        nestedCachingObservable.Subscribe(nestedObs);
+        new Action(() =>
+        {
+            obs.Values.LastOrDefault().Should().Be(result);
+            nestedObs.Values.LastOrDefault().Should().Be(result);
+        }).ShouldPassIn(10.Seconds());
     }
     
     [Test]
@@ -115,16 +155,16 @@ public class SubtreesObservingState_Tests
         for (var i = 0; i < maxSubtrees; i++)
         {
             var path = new ClusterConfigPath(pathPrefix + i);
-            state.TryAddSubtree(path, out var tcs).Should().BeTrue();
+            state.TryAddSubtree(path, out var tcs, out _).Should().BeTrue();
             tcs.Task.IsCompleted.Should().BeFalse();
             tcss.Add(tcs);
         }
 
         //(deniaa): This one should be converted to root (""), because we have reached maxSubtrees limit.
-        state.TryAddSubtree("foo/bar", out var rootTcs).Should().BeTrue();
+        state.TryAddSubtree("foo/bar", out var rootTcs, out _).Should().BeTrue();
         rootTcs.Task.IsCompleted.Should().BeFalse();
         //(deniaa): As we already have root in the state, all next additions should return false.
-        state.TryAddSubtree("foo/baz", out var nextTcs).Should().BeFalse();
+        state.TryAddSubtree("foo/baz", out var nextTcs, out _).Should().BeFalse();
         //(deniaa): Due to current realization they are just the same object it that case.
         ReferenceEquals(nextTcs, rootTcs).Should().BeTrue();
 
@@ -132,11 +172,43 @@ public class SubtreesObservingState_Tests
         var subtreesToRequest = state.GetSubtreesToRequest();
         subtreesToRequest.Single().Path.Should().Be(new ClusterConfigPath(""));
         
-        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow);
+        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, observable);
         
         rootTcs.Task.IsCompleted.Should().BeTrue();
         foreach (var tcs in tcss)
             tcs.Task.IsCompleted.Should().BeTrue();
+    }
+
+    [Test]
+    public void Observable_from_dislocated_element_should_work()
+    {
+        state.TryAddSubtree("foo/bar", out _, out var subtreeCachingObservable).Should().BeTrue();
+        var subtreesToRequest = state.GetSubtreesToRequest();
+        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, observable);        
+        var subtreeObs = new TestObserver<ClusterConfigClientState>();
+        subtreeCachingObservable.Subscribe(subtreeObs);
+        new Action(() =>
+        {
+            ReferenceEquals(subtreeObs.Values.LastOrDefault(), result).Should().BeTrue();
+        }).ShouldPassIn(10.Seconds());
+        
+        state.TryAddSubtree("foo", out _, out var rootCachingObservable).Should().BeTrue();
+        subtreesToRequest = state.GetSubtreesToRequest();
+        subtreesToRequest.Should().HaveCount(1);
+        subtreesToRequest.Single().Path.Equivalent(new ClusterConfigPath("foo")).Should().BeTrue();
+        
+        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, observable);
+
+        var newState = new ClusterConfigClientState(null, null, new RecyclingBoundedCache<ClusterConfigPath, ISettingsNode>(11), 77);
+        observable.Next(newState);
+        
+        var rootObs = new TestObserver<ClusterConfigClientState>();
+        rootCachingObservable.Subscribe(rootObs);
+        new Action(() =>
+        {
+            ReferenceEquals(subtreeObs.Values.LastOrDefault(), newState).Should().BeTrue();
+            ReferenceEquals(rootObs.Values.LastOrDefault(), newState).Should().BeTrue();
+        }).ShouldPassIn(10.Seconds());
     }
 
     [Test]
@@ -170,7 +242,7 @@ public class SubtreesObservingState_Tests
     {
         for (var i = offset; i < prefixes.Length && i < offset + length; i++)
         {
-            state.TryAddSubtree(new ClusterConfigPath(prefixes[i]), out _);
+            state.TryAddSubtree(new ClusterConfigPath(prefixes[i]), out _, out _);
         }
     }
 

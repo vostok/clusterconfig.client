@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -129,7 +130,7 @@ namespace Vostok.ClusterConfig.Client
 
                 PropagateError(new ObjectDisposedException(GetType().Name), true);
                 
-                subtreesObservingState.Cancel();
+                subtreesObservingState.Cancel(stateObservable);
             }
         }
 
@@ -150,7 +151,7 @@ namespace Vostok.ClusterConfig.Client
         {
             InitiatePeriodicUpdates();
 
-            if (subtreesObservingState.TryAddSubtree(clusterConfigPath, out var tcs))
+            if (subtreesObservingState.TryAddSubtree(clusterConfigPath, out var tcs, out _))
             {
                 immediatelyUpdateCompletionSource.TrySetResult(true);
             }
@@ -164,7 +165,7 @@ namespace Vostok.ClusterConfig.Client
         {
             InitiatePeriodicUpdates();
 
-            if (subtreesObservingState.TryAddSubtree(clusterConfigPath, out var tcs))
+            if (subtreesObservingState.TryAddSubtree(clusterConfigPath, out var tcs, out _))
             {
                 immediatelyUpdateCompletionSource.TrySetResult(true);
             }
@@ -178,15 +179,16 @@ namespace Vostok.ClusterConfig.Client
         {
             InitiatePeriodicUpdates();
 
-            if (subtreesObservingState.TryAddSubtree(clusterConfigPath, out var tcs))
+            if (subtreesObservingState.TryAddSubtree(clusterConfigPath, out _, out var subtreeObservable))
             {
                 immediatelyUpdateCompletionSource.TrySetResult(true);
                 //(deniaa): Compare with ObtainStateAsync method here we will not wait for the first settings from server for given path.
-                //(deniaa): It's an observable and it will notify subscribers when a value is recieved.
+                //(deniaa): It's an observable and it will notify subscribers when a value is received.
                 //(deniaa): So here we just cancel token to force the update.  
             }
             
-            return stateObservable;
+            //(deniaa): If subtreesObservingState is cancelled and subtreeObservable is null we can return common and cancelled stateObservable.
+            return subtreeObservable ?? stateObservable;
         }
 
         private void InitiatePeriodicUpdates()
@@ -240,7 +242,7 @@ namespace Vostok.ClusterConfig.Client
                 var budget = TimeBudget.StartNew(settings.UpdatePeriod);
 
                 if (protocol != ClusterConfigProtocolVersion.V3)
-                    subtreesObservingState.TryAddSubtree(new ClusterConfigPath(""), out _);
+                    subtreesObservingState.TryAddSubtree(new ClusterConfigPath(""), out _, out _);
                 var observingSubtrees = subtreesObservingState.GetSubtreesToRequest();
 
                 try
@@ -259,11 +261,11 @@ namespace Vostok.ClusterConfig.Client
                     }
 
                     if (currentState == null || localUpdateResult.Changed || remoteUpdateResult.Changed)
-                        PropagateNewState(CreateNewState(currentState, localUpdateResult, remoteUpdateResult), cancellationToken);
+                        PropagateNewState(CreateNewState(currentState, localUpdateResult, remoteUpdateResult), observingSubtrees, cancellationToken);
 
                     //(deniaa): We could make a version for each subtree and change it only if content have changed.
                     //(deniaa): So as not to do useless changes of unchanged subtree if zone has changed elsewhere.
-                    subtreesObservingState.FinalizeSubtrees(observingSubtrees, remoteUpdateResult.Version);
+                    subtreesObservingState.FinalizeSubtrees(observingSubtrees, remoteUpdateResult.Version, stateObservable);
 
                     lastLocalResult = localUpdateResult;
                     lastRemoteResult = remoteUpdateResult;
@@ -279,7 +281,7 @@ namespace Vostok.ClusterConfig.Client
                         PropagateError(new ClusterConfigClientException("Failure in initial settings update.", error), false);
 
                     if (observingSubtrees != null)
-                        subtreesObservingState.FinalizeSubtrees(observingSubtrees, null);
+                        subtreesObservingState.FinalizeSubtrees(observingSubtrees, null, stateObservable);
                 }
 
                 await Task.WhenAny(Task.Delay(budget.Remaining, cancellationToken), immediatelyUpdateCompletionSource.Task).ConfigureAwait(false);
@@ -343,7 +345,10 @@ namespace Vostok.ClusterConfig.Client
             return new ClusterConfigClientState(newLocalTree, newRemoteSubtrees, newCaches, newVersion);
         }
 
-        private void PropagateNewState([NotNull] ClusterConfigClientState state, CancellationToken cancellationToken)
+        private void PropagateNewState(
+            [NotNull] ClusterConfigClientState state, 
+            List<ObservingSubtree> observingSubtrees, 
+            CancellationToken cancellationToken)
         {
             if (!stateSource.TrySetResult(state))
             {
@@ -368,7 +373,12 @@ namespace Vostok.ClusterConfig.Client
                     {
                         // (iloktionov): 'stateObservable' might have been already completed by failed initial update iteration. In that case it has to be created from scratch:
                         if (stateObservable.IsCompleted)
+                        {
                             stateObservable = new CachingObservable<ClusterConfigClientState>();
+
+                            foreach (var observingSubtree in observingSubtrees)
+                                observingSubtree.RefreshObservable(stateObservable);
+                        }
 
                         if (ReferenceEquals(state, GetCurrentState()))
                             stateObservable.Next(state);

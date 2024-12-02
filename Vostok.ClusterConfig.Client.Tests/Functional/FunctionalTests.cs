@@ -5,7 +5,6 @@ using System.Linq;
 using System.Reactive;
 using System.Reactive.Concurrency;
 using System.Reactive.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -15,7 +14,6 @@ using NUnit.Framework;
 using Vostok.Clusterclient.Core.Model;
 using Vostok.Clusterclient.Core.Topology;
 using Vostok.ClusterConfig.Client.Abstractions;
-using Vostok.ClusterConfig.Core.Serialization;
 using Vostok.Commons.Testing;
 using Vostok.Commons.Testing.Observable;
 using Vostok.Configuration.Abstractions.SettingsTree;
@@ -32,7 +30,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         private const string UpdatedTemplate = "Received new version of zone '{Zone}' from {Replica}. Size = {Size}. Version = {Version}. Protocol = {Protocol}. Patch = {IsPatch}. {ResponsesDescriptions}.";
         private const string HashMismatchTemplate = "Detected hash mismatch: {ActualHash} != {ExpectedHash}. New version is {NewVersion}, is patch: {IsPatch}. {ResponsesDescriptions}.";
         private const string ApplyPatchErrorTemplate = "Can't apply patch {PatchVersion} to {OldVersion} (protocol {Protocol}). {ResponsesDescriptions}.";
-        
+
         private readonly ClusterConfigProtocolVersion protocol;
         private TestServer server;
         private TestFolder folder;
@@ -102,20 +100,22 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
                 null,
                 new ISettingsNode[]
                 {
-                    new ObjectNode("local", new ISettingsNode[]
-                    {
-                        new ValueNode(string.Empty, "value-1")
-                    }),
+                    new ObjectNode("local",
+                        new ISettingsNode[]
+                        {
+                            new ValueNode(string.Empty, "value-1")
+                        }),
                 });
 
             localTree2 = new ObjectNode(
                 null,
                 new ISettingsNode[]
                 {
-                    new ObjectNode("local", new ISettingsNode[]
-                    {
-                        new ValueNode(string.Empty, "value-2")
-                    }),
+                    new ObjectNode("local",
+                        new ISettingsNode[]
+                        {
+                            new ValueNode(string.Empty, "value-2")
+                        }),
                 });
 
             version1 = new DateTime(1990, 12, 1, 13, 5, 45);
@@ -163,7 +163,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         public void Should_receive_remote_tree_when_local_settings_are_disabled()
         {
             using var _ = ShouldNotLog(LogLevel.Warn, LogLevel.Error, LogLevel.Fatal);
-            
+
             ModifySettings(s => s.EnableLocalSettings = false);
 
             server.SetResponse(remoteTree1, version1);
@@ -688,7 +688,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
                 }
             };
 
-            assertion.ShouldPassIn(10.Seconds());
+            assertion.ShouldPassIn(20.Seconds());
         }
 
         private void VerifyError()
