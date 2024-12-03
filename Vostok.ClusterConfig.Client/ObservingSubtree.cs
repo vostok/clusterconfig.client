@@ -8,6 +8,8 @@ namespace Vostok.ClusterConfig.Client;
 internal class ObservingSubtree
 {
     private readonly object observablePropagationLock;
+    private IDisposable lastSubscription;
+
     public ObservingSubtree(ClusterConfigPath path)
     {
         observablePropagationLock = new object();
@@ -32,7 +34,8 @@ internal class ObservingSubtree
             {
                 lock (observablePropagationLock)
                 {
-                    stateObservable.Subscribe(new TransmittingObserver(SubtreeStateObservable));
+                    lastSubscription?.Dispose();
+                    lastSubscription = stateObservable.Subscribe(new TransmittingObserver(SubtreeStateObservable));
                 }
             });
         }
@@ -47,7 +50,8 @@ internal class ObservingSubtree
                 if (SubtreeStateObservable.IsCompleted)
                     SubtreeStateObservable = new CachingObservable<ClusterConfigClientState>();
 
-                stateObservable.Subscribe(new TransmittingObserver(SubtreeStateObservable));
+                lastSubscription?.Dispose();
+                lastSubscription = stateObservable.Subscribe(new TransmittingObserver(SubtreeStateObservable));
             }
         });
     }
