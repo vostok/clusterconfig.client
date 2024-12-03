@@ -46,7 +46,7 @@ public class SubtreesObservingState_Tests
 
         var obs = new TestObserver<ClusterConfigClientState>();
         cachingObservable.Subscribe(obs);
-        new Action(() => obs.Values.LastOrDefault().Should().BeNull()).ShouldPassIn(10.Seconds());
+        new Action(() => obs.Values.Should().BeEmpty()).ShouldNotFailIn(5.Seconds());
         
         state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, observable);
         tcs.Task.IsCompleted.Should().BeTrue();
@@ -87,8 +87,8 @@ public class SubtreesObservingState_Tests
         state.TryAddSubtree(nestedPath, out var nestedTcs, out var nestedCachingObservable).Should().BeFalse();
         nestedTcs.Task.IsCompleted.Should().BeFalse();
         //(deniaa): Due to current realization they are just the same object it that case.
-        ReferenceEquals(tcs, nestedTcs).Should().BeTrue();
-        ReferenceEquals(cachingObservable, nestedCachingObservable).Should().BeTrue();
+        tcs.Should().BeSameAs(nestedTcs);
+        cachingObservable.Should().BeSameAs(nestedCachingObservable);
 
         var subtreesToRequest = state.GetSubtreesToRequest();
         tcs.Task.IsCompleted.Should().BeFalse();
@@ -122,8 +122,8 @@ public class SubtreesObservingState_Tests
         state.TryAddSubtree(path, out var tcs, out var cachingObservable).Should().BeTrue();
         tcs.Task.IsCompleted.Should().BeFalse();
         //(deniaa): Due to current realization they are both should stay in state with different TCS's it that case.
-        ReferenceEquals(tcs, nestedTcs).Should().BeFalse();
-        ReferenceEquals(nestedCachingObservable, cachingObservable).Should().BeFalse();
+        tcs.Should().NotBeSameAs(nestedTcs);
+        nestedCachingObservable.Should().NotBeSameAs(cachingObservable);
 
         var subtreesToRequest = state.GetSubtreesToRequest();
         tcs.Task.IsCompleted.Should().BeFalse();
@@ -166,7 +166,7 @@ public class SubtreesObservingState_Tests
         //(deniaa): As we already have root in the state, all next additions should return false.
         state.TryAddSubtree("foo/baz", out var nextTcs, out _).Should().BeFalse();
         //(deniaa): Due to current realization they are just the same object it that case.
-        ReferenceEquals(nextTcs, rootTcs).Should().BeTrue();
+        nextTcs.Should().BeSameAs(rootTcs);
 
 
         var subtreesToRequest = state.GetSubtreesToRequest();
@@ -189,7 +189,7 @@ public class SubtreesObservingState_Tests
         subtreeCachingObservable.Subscribe(subtreeObs);
         new Action(() =>
         {
-            ReferenceEquals(subtreeObs.Values.LastOrDefault(), result).Should().BeTrue();
+            subtreeObs.Values.LastOrDefault().Should().BeSameAs(result);
         }).ShouldPassIn(10.Seconds());
         
         state.TryAddSubtree("foo", out _, out var rootCachingObservable).Should().BeTrue();
@@ -206,9 +206,25 @@ public class SubtreesObservingState_Tests
         rootCachingObservable.Subscribe(rootObs);
         new Action(() =>
         {
-            ReferenceEquals(subtreeObs.Values.LastOrDefault(), newState).Should().BeTrue();
-            ReferenceEquals(rootObs.Values.LastOrDefault(), newState).Should().BeTrue();
+            subtreeObs.Values.LastOrDefault().Should().BeSameAs(newState);
+            rootObs.Values.LastOrDefault().Should().BeSameAs(newState);
         }).ShouldPassIn(10.Seconds());
+    }
+
+    [Test]
+    public void Sequential_finalize_should_subscribe_observer_only_once()
+    {        
+        state.TryAddSubtree("foo/bar", out _, out var subtreeCachingObservable).Should().BeTrue();
+        var subtreeObs = new TestObserver<ClusterConfigClientState>();
+        subtreeCachingObservable.Subscribe(subtreeObs);
+
+        for (var i = 0; i < 10; i++)
+        {
+            var subtreesToRequest = state.GetSubtreesToRequest();
+            state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, observable);
+        }
+
+        new Action(() => subtreeObs.Values.Should().HaveCount(1)).ShouldPassIn(10.Seconds());
     }
 
     [Test]

@@ -26,14 +26,16 @@ internal class ObservingSubtree
 
     public void FinalizeSubtree(CachingObservable<ClusterConfigClientState> stateObservable)
     {
-        AtLeastOnceObtaining.TrySetResult(true);
-        Task.Run(() =>
+        if (AtLeastOnceObtaining.TrySetResult(true))
         {
-            lock (observablePropagationLock)
+            Task.Run(() =>
             {
-                stateObservable.Subscribe(new TransmittingObserver(SubtreeStateObservable));
-            }
-        });
+                lock (observablePropagationLock)
+                {
+                    stateObservable.Subscribe(new TransmittingObserver(SubtreeStateObservable));
+                }
+            });
+        }
     }
 
     public void RefreshObservable(CachingObservable<ClusterConfigClientState> stateObservable)
