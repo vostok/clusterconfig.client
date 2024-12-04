@@ -1,3 +1,9 @@
+## 0.2.23 (20-11-2024):
+
+Add support for the new V3 protocol. This protocol allows working not with the full tree, but only with the required subtrees. All code is adapted to this feature, but the default protocol is still V2. V3 can be enabled in `ClusterConfigClientSettings.ForcedProtocolVersion`.
+
+Breaking changes ror V3: Not first access to settings (but the first access to required subtree) can now go to the backend and download settings. And can even fail with an exception. In version 2, the first access to any settings downloaded the entire tree and was always served from the cache.
+
 ## 0.2.22 (20-11-2024):
 
 Update ClusterClient libraries
