@@ -4,6 +4,7 @@ const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.Dns = "clusterconf
 const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.InternedValuesCacheCapacity = 0 -> int
 const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.LocalFolder = "settings" -> string
 const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.MaximumFileSize = 1048576 -> int
+const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.MaximumSubtrees = 30 -> int
 const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.Port = 9000 -> int
 const Vostok.ClusterConfig.Client.ClusterConfigClientDefaults.Zone = "default" -> string
 override Vostok.ClusterConfig.Core.Patching.DeleteNode.Equals(object obj) -> bool
@@ -53,6 +54,8 @@ Vostok.ClusterConfig.Client.ClusterConfigClientSettings.Log.get -> Vostok.Loggin
 Vostok.ClusterConfig.Client.ClusterConfigClientSettings.Log.set -> void
 Vostok.ClusterConfig.Client.ClusterConfigClientSettings.MaximumFileSize.get -> int
 Vostok.ClusterConfig.Client.ClusterConfigClientSettings.MaximumFileSize.set -> void
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.MaximumSubtrees.get -> int
+Vostok.ClusterConfig.Client.ClusterConfigClientSettings.MaximumSubtrees.set -> void
 Vostok.ClusterConfig.Client.ClusterConfigClientSettings.MergeOptions.get -> Vostok.Configuration.Abstractions.Merging.SettingsMergeOptions
 Vostok.ClusterConfig.Client.ClusterConfigClientSettings.MergeOptions.set -> void
 Vostok.ClusterConfig.Client.ClusterConfigClientSettings.RequestTimeout.get -> System.TimeSpan
@@ -64,6 +67,7 @@ Vostok.ClusterConfig.Client.ClusterConfigClientSettings.Zone.set -> void
 Vostok.ClusterConfig.Client.ClusterConfigProtocolVersion
 Vostok.ClusterConfig.Client.ClusterConfigProtocolVersion.V1 = 1 -> Vostok.ClusterConfig.Client.ClusterConfigProtocolVersion
 Vostok.ClusterConfig.Client.ClusterConfigProtocolVersion.V2 = 2 -> Vostok.ClusterConfig.Client.ClusterConfigProtocolVersion
+Vostok.ClusterConfig.Client.ClusterConfigProtocolVersion.V3 = 3 -> Vostok.ClusterConfig.Client.ClusterConfigProtocolVersion
 Vostok.ClusterConfig.Client.DefaultSettingsProvider
 Vostok.ClusterConfig.Client.Helpers.DnsClusterProvider
 Vostok.ClusterConfig.Client.Helpers.DnsClusterProvider.Dns.get -> string
