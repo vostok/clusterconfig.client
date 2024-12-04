@@ -17,7 +17,7 @@ notests *default:
     - vostok.configuration.abstractions
     - vostok.configuration.sources
     - vostok.clusterconfig.client.abstractions
-    - vostok.clusterconfig.core/src@subtrees-protocol
+    - vostok.clusterconfig.core/src
     - vostok.commons.collections/src
     - vostok.commons.helpers/src
     - vostok.commons.threading/src
