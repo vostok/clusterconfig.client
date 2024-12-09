@@ -1,3 +1,7 @@
+## 0.2.25 (09-12-2024):
+
+Bugfix: When server recommended downgrading Procotol, it couldn't work until the version changed at least once.
+
 ## 0.2.24 (09-12-2024):
 
 V3 protocol (see changes for 0.2.23) is new used by default.
