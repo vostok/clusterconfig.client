@@ -9,6 +9,7 @@ internal class ObservingSubtree
 {
     private readonly object observablePropagationLock;
     private IDisposable lastSubscription;
+    private CachingObservable<ClusterConfigClientState> lastObservable;
 
     public ObservingSubtree(ClusterConfigPath path)
     {
@@ -26,19 +27,25 @@ internal class ObservingSubtree
     public CachingObservable<ClusterConfigClientState> SubtreeStateObservable { get; private set; }
     public DateTime? LastVersion { get; set; }
 
-    public void FinalizeSubtree(CachingObservable<ClusterConfigClientState> stateObservable)
+    public void FinalizeSubtree()
     {
-        if (AtLeastOnceObtaining.TrySetResult(true))
+        AtLeastOnceObtaining.TrySetResult(true);
+    }
+
+    public void EnsureSubscribed(CachingObservable<ClusterConfigClientState> stateObservable)
+    {
+        if (lastObservable == stateObservable)
+            return;
+        
+        Task.Run(() =>
         {
-            Task.Run(() =>
+            lock (observablePropagationLock)
             {
-                lock (observablePropagationLock)
-                {
-                    lastSubscription?.Dispose();
-                    lastSubscription = stateObservable.Subscribe(new TransmittingObserver(SubtreeStateObservable));
-                }
-            });
-        }
+                lastSubscription?.Dispose();
+                lastObservable = stateObservable;
+                lastSubscription = stateObservable.Subscribe(new TransmittingObserver(SubtreeStateObservable));
+            }
+        });
     }
 
     public void RefreshObservable(CachingObservable<ClusterConfigClientState> stateObservable)
@@ -51,6 +58,7 @@ internal class ObservingSubtree
                     SubtreeStateObservable = new CachingObservable<ClusterConfigClientState>();
 
                 lastSubscription?.Dispose();
+                lastObservable = stateObservable;
                 lastSubscription = stateObservable.Subscribe(new TransmittingObserver(SubtreeStateObservable));
             }
         });

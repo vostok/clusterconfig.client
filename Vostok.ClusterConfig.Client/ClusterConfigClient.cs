@@ -130,7 +130,7 @@ namespace Vostok.ClusterConfig.Client
 
                 PropagateError(new ObjectDisposedException(GetType().Name), true);
                 
-                subtreesObservingState.Cancel(stateObservable);
+                subtreesObservingState.Cancel();
             }
         }
 
@@ -372,16 +372,23 @@ namespace Vostok.ClusterConfig.Client
                     lock (observablePropagationLock)
                     {
                         // (iloktionov): 'stateObservable' might have been already completed by failed initial update iteration. In that case it has to be created from scratch:
+                        var needRefresh = false;
                         if (stateObservable.IsCompleted)
                         {
                             stateObservable = new CachingObservable<ClusterConfigClientState>();
-
-                            foreach (var observingSubtree in observingSubtrees)
-                                observingSubtree.RefreshObservable(stateObservable);
+                            needRefresh = true;
                         }
 
                         if (ReferenceEquals(state, GetCurrentState()))
                             stateObservable.Next(state);
+
+                        foreach (var observingSubtree in observingSubtrees)
+                        {
+                            if (needRefresh)
+                                observingSubtree.RefreshObservable(stateObservable);
+                            else
+                                observingSubtree.EnsureSubscribed(stateObservable);
+                        }
                     }
                 });
         }

@@ -18,7 +18,7 @@ internal class SubtreesObservingState
     private readonly TaskCompletionSource<bool> completedTaskCompletionSource = new();
     private readonly object lockObject = new();
     private readonly int maxSubtrees;
-    
+
     private volatile bool cancelled = false;
     
     /// <summary>
@@ -88,7 +88,7 @@ internal class SubtreesObservingState
             if (subtreeToFinalize.AtLeastOnceObtaining.Task.IsCompleted)
                 continue;
 
-            subtreeToFinalize.FinalizeSubtree(cachingObservable);
+            subtreeToFinalize.FinalizeSubtree();
 
             CleanupLeafSubtrees(subtreeToFinalize, cachingObservable);
         }
@@ -187,7 +187,7 @@ internal class SubtreesObservingState
             //(deniaa): Since we have already finalized our subtree of all these nested sub-subtrees and removed all these sub-subtrees,
             //(deniaa) we have to set their token to unlock waiters.  
             foreach (var removedSubtree in subtreesToRemove)
-                removedSubtree.FinalizeSubtree(cachingObservable);
+                removedSubtree.FinalizeSubtree();
         }
     }
 
@@ -212,7 +212,7 @@ internal class SubtreesObservingState
         return false;
     }
 
-    public void Cancel(CachingObservable<ClusterConfigClientState> cachingObservable)
+    public void Cancel()
     {
         lock (lockObject)
         {
@@ -220,7 +220,7 @@ internal class SubtreesObservingState
             
             foreach (var observingSubtree in observingSubtrees)
             {
-                observingSubtree.FinalizeSubtree(cachingObservable);
+                observingSubtree.FinalizeSubtree();
             }
         }
     }
