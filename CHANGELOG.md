@@ -1,3 +1,7 @@
+## 0.2.24 (09-12-2024):
+
+V3 protocol (see changes for 0.2.23) is new used by default.
+
 ## 0.2.23 (20-11-2024):
 
 Add support for the new V3 protocol. This protocol allows working not with the full tree, but only with the required subtrees. All code is adapted to this feature, but the default protocol is still V2. V3 can be enabled in `ClusterConfigClientSettings.ForcedProtocolVersion`.
