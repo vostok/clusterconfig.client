@@ -176,7 +176,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             if (withContent)
                 request = request.WithContent(SerializeRequest(observingSubtrees, patchingFailedReason != null || protocolChanged));
 
-            if (protocol < ClusterConfigProtocolVersion.V3 && lastVersion.HasValue)
+            if (protocol < ClusterConfigProtocolVersion.V3 && lastVersion.HasValue && !protocolChanged)
                 request = request.WithIfModifiedSinceHeader(lastVersion.Value);
 
             if (patchingFailedReason != null)
@@ -262,7 +262,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             
             var version = DateTime.Parse(response.Headers.LastModified, null, DateTimeStyles.AssumeUniversal).ToUniversalTime();
 
-            if (lastUpdateResult != null && version <= lastUpdateResult.Version && protocol < ClusterConfigProtocolVersion.V3)
+            if (lastUpdateResult != null && version <= lastUpdateResult.Version && protocol < ClusterConfigProtocolVersion.V3 && !protocolChanged)
             {
                 if (version < lastUpdateResult.Version)
                     LogStaleVersion(version, lastUpdateResult.Version, protocol, responsesDescriptions);
