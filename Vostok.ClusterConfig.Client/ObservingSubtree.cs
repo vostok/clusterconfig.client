@@ -53,7 +53,7 @@ internal class ObservingSubtree
         {
             Task.Run(async () =>
             {
-                await propagationTask;
+                await propagationTask.ConfigureAwait(false);
                 lock (observablePropagationLock)
                 {
                     if (SubtreeStateObservable.IsCompleted)
@@ -72,7 +72,7 @@ internal class ObservingSubtree
         if (pushedToSource || alwaysPushToObservable)
             Task.Run(async () =>
             {
-                await propagationTask;
+                await propagationTask.ConfigureAwait(false);
                 lock (observablePropagationLock)
                 {
                     if (atLeastOnceObtaining.Task.IsFaulted || alwaysPushToObservable)
