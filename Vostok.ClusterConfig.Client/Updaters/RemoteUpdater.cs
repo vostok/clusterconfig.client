@@ -297,7 +297,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             {
                 //(deniaa): Until we override BufferFactory for transport and create a buffer for gzip decompression, each Content is a new byte array. So we can refer to subsequences of it.
                 var responseContent = response.Content.ToArraySegment();
-                var reader = new BinaryBufferReader(responseContent.Array!, responseContent.Offset);
+                var reader = new ArraySegmentReader(responseContent);
 
                 var deserializedSubtrees = SubtreesResponseSerializer.Deserialize(reader, Encoding.UTF8, true);
                 
@@ -310,7 +310,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 var haveAnyModifiedSubtree = deserializedSubtrees.Any(s => s.Value.WasModified);
                 var treesSize = remoteSubtrees.Subtrees.Sum(x => x.Value?.Size ?? 0);
 
-                LogReceivedNewSubtrees(treesSize, version, replica, protocol, responsesDescriptions);
+                LogReceivedNewSubtrees(treesSize, responseContent.Count, version, replica, protocol, responsesDescriptions);
                 return new RemoteUpdateResult(haveAnyModifiedSubtree, haveAnyModifiedSubtree ? remoteSubtrees : lastResult.Subtrees, description, protocol, version, recommendedProtocol, null);
             }
             else
@@ -473,9 +473,9 @@ namespace Vostok.ClusterConfig.Client.Updaters
             => log.Info("Received new version of zone '{Zone}' from {Replica}. Size = {Size}. Version = {Version}. Protocol = {Protocol}. Patch = {IsPatch}. {ResponsesDescriptions}.", 
                 zone, replica?.Authority, treeSize, version.ToString("R"), protocol.ToString(), patch, responsesDescriptions);
         
-        private void LogReceivedNewSubtrees(int treesSize, DateTime version, Uri replica, ClusterConfigProtocolVersion protocol, string responsesDescriptions)
-            => log.Info("Received new subtrees from '{Zone}' from {Replica}. Size = {Size}. Version = {Version}. Protocol = {Protocol}. {ResponsesDescriptions}.", 
-                zone, replica?.Authority, treesSize, version.ToString("R"), protocol.ToString(), responsesDescriptions);
+        private void LogReceivedNewSubtrees(int treesSize, int responseSize, DateTime version, Uri replica, ClusterConfigProtocolVersion protocol, string responsesDescriptions)
+            => log.Info("Received new subtrees from '{Zone}' from {Replica}. Response size = {ResponseSize}. New settings size = {SettingsSize}. Version = {Version}. Protocol = {Protocol}. {ResponsesDescriptions}.", 
+                zone, replica?.Authority, responseSize, treesSize, version.ToString("R"), protocol.ToString(), responsesDescriptions);
 
         #endregion
 
