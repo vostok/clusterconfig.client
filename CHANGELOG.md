@@ -1,3 +1,7 @@
+## 0.2.27 (16-12-2024): 
+
+Bump NuGet deps versions
+
 ## 0.2.26 (09-12-2024):
 
 V2 protocol is now used by default due to temporary backend instability under heavy load. 
