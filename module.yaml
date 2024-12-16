@@ -12,12 +12,12 @@ notests *default:
   deps:
     - vostok.devtools
     - vostok.logging.abstractions
-    - vostok.clusterclient.core@subtrees-protocol-bugfix2
+    - vostok.clusterclient.core
     - vostok.clusterclient.transport
     - vostok.configuration.abstractions
     - vostok.configuration.sources
     - vostok.clusterconfig.client.abstractions
-    - vostok.clusterconfig.core/src
+    - vostok.clusterconfig.core/src@subtrees-protocol-bugfix2
     - vostok.commons.collections/src
     - vostok.commons.helpers/src
     - vostok.commons.threading/src
