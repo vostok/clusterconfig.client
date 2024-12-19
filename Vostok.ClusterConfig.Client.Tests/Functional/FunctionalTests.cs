@@ -22,9 +22,9 @@ using Vostok.Logging.Console;
 
 namespace Vostok.ClusterConfig.Client.Tests.Functional
 {
-    //TODO test V3
     [TestFixture(ClusterConfigProtocolVersion.V1)]
     [TestFixture(ClusterConfigProtocolVersion.V2)]
+    [TestFixture(ClusterConfigProtocolVersion.V3)]
     internal class FunctionalTests
     {
         private const string UpdatedTemplate = "Received new version of zone '{Zone}' from {Replica}. Size = {Size}. Version = {Version}. Protocol = {Protocol}. Patch = {IsPatch}. {ResponsesDescriptions}.";
@@ -67,6 +67,11 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 
             settings = new ClusterConfigClientSettings
             {
+                AdditionalSetup = s =>
+                {
+                    //To speed up tests which should be faced with Timeouts (default is 30 seconds)
+                    s.DefaultTimeout = 10.Seconds();
+                },
                 EnableLocalSettings = true,
                 EnableClusterSettings = true,
                 LocalFolder = folder.Directory.FullName,
@@ -335,7 +340,15 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         {
             Task.Delay(5.Seconds()).ContinueWith(_ => server.SetResponse(remoteTree1, version1));
 
-            client.Get(ClusterConfigPath.Empty).Should().NotBeNull();
+            var a = () =>
+            {
+                var b = () =>
+                {
+                    client.Get(ClusterConfigPath.Empty).Should().NotBeNull();
+                };
+                b.Should().NotThrow();
+            };
+            a.ShouldNotFailIn(10.Seconds());
         }
 
         [Test]
@@ -584,7 +597,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             
             ((Action) (() => log.Received().Log(Arg.Is<LogEvent>(e => e.Level == LogLevel.Warn && e.MessageTemplate == HashMismatchTemplate)))).ShouldPassIn(10.Seconds());
             
-            ((Action) (() => server.AsserRequest(r => r.Query.Should().Contain("forceFull=HashMismatch")))).ShouldPassIn(10.Seconds());
+            ((Action) (() => server.AssertRequestUrl(r => r.Query.Should().Contain("forceFull=HashMismatch")))).ShouldPassIn(10.Seconds());
             
             log.ClearReceivedCalls();
             
@@ -619,7 +632,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             
             ((Action) (() => log.Received().Log(Arg.Is<LogEvent>(e => e.Level == LogLevel.Error && e.MessageTemplate == ApplyPatchErrorTemplate && e.Exception != null)))).ShouldPassIn(10.Seconds());
             
-            ((Action) (() => server.AsserRequest(r => r.Query.Should().Contain("forceFull=ApplyPatchFailed")))).ShouldPassIn(10.Seconds());
+            ((Action) (() => server.AssertRequestUrl(r => r.Query.Should().Contain("forceFull=ApplyPatchFailed")))).ShouldPassIn(10.Seconds());
             
             log.ClearReceivedCalls();
             
@@ -651,6 +664,23 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             log.Received().Log(Arg.Is<LogEvent>(e => e.Level == LogLevel.Info && e.MessageTemplate == UpdatedTemplate && e.Properties["IsPatch"].ToString() == "True"));
         }
 
+        [Test]
+        [Repeat(10)]
+        //(deniaa): There were a races between several observables even in sequential call. This probability test check that we have no such races.
+        public void Test_V3_sequential_observe()
+        {
+            server.SetResponse(remoteTree1, version1);
+
+            var fooObs = client.Observe("foo");
+            fooObs.WaitFirstValue(5.Seconds()).Should().Be(remoteTree1["foo"]);
+            
+            var barObs = client.Observe("bar");
+            barObs.WaitFirstValue(5.Seconds()).Should().Be(remoteTree1["bar"]);
+            
+            var bazObs = client.Observe("baz");
+            bazObs.WaitFirstValue(5.Seconds()).Should().Be(remoteTree1["baz"]);
+        }
+
         private void ModifySettings(Action<ClusterConfigClientSettings> modify)
         {
             modify(settings);
@@ -662,7 +692,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         {
             Action assertion = () =>
             {
-                try
+                var action = new Action(() =>
                 {
                     client.Get(path).Should().Be(expectedTree);
 
@@ -681,14 +711,12 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
                         client.ObserveWithVersions(path).WaitFirstValue(1.Seconds()).settings.Should().Be(expectedTree);
                         client.ObserveWithVersions(path).WaitFirstValue(1.Seconds()).version.Should().Be(expectedVersion);
                     }
-                }
-                catch (ClusterConfigClientException error)
-                {
-                    throw new AssertionException("", error);
-                }
+                });
+
+                action.Should().NotThrow();
             };
 
-            assertion.ShouldPassIn(20.Seconds());
+            assertion.ShouldPassIn(20.Seconds(), 100.Milliseconds());
         }
 
         private void VerifyError()

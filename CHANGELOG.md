@@ -1,3 +1,7 @@
+## 0.2.26 (09-12-2024):
+
+V2 protocol is now used by default due to temporary backend instability under heavy load. 
+
 ## 0.2.25 (09-12-2024):
 
 Bugfix: When server recommended downgrading Procotol, it couldn't work until the version changed at least once.

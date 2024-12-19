@@ -1,13 +1,16 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Net;
+using System.Text;
 using System.Threading.Tasks;
 using Vostok.Clusterclient.Core.Model;
-using Vostok.ClusterConfig.Client.Abstractions;
 using Vostok.ClusterConfig.Client.Helpers;
 using Vostok.ClusterConfig.Core.Http;
 using Vostok.ClusterConfig.Core.Patching;
+using Vostok.ClusterConfig.Core.Serialization.SubtreesProtocol;
+using Vostok.ClusterConfig.Core.Serialization.V2;
 using Vostok.ClusterConfig.Core.Utils;
 using Vostok.Commons.Binary;
 using Vostok.Commons.Collections;
@@ -20,8 +23,15 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
     {
         private readonly ClusterConfigProtocolVersion protocol;
         private readonly HttpListener listener;
+        private volatile HttpListenerRequest request;
+        private volatile Dictionary<string,ArraySegment<byte>> subtreesMap;
+        private volatile byte[] serializedPatch;
+        private volatile string hash;
+        private DateTime version;
+        private volatile byte[] serializedTree;
+        private ClusterConfigProtocolVersion? recommendedProtocol;
+        private volatile ResponseCode subtreesResponseCode;
         private volatile Response response;
-        private volatile Uri request;
 
         public TestServer(ClusterConfigProtocolVersion protocol)
         {
@@ -31,7 +41,9 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             listener = new HttpListener();
             listener.Prefixes.Add(Url);
 
+            subtreesResponseCode = ResponseCode.ServiceUnavailable;
             response = Responses.ServiceUnavailable;
+            recommendedProtocol = protocol;
         }
 
         public int Port { get; }
@@ -42,7 +54,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         {
             listener.Start();
 
-            Task.Run(() => RequestHandlingLoop());
+            Task.Run(RequestHandlingLoop);
         }
 
         public void Stop()
@@ -58,11 +70,20 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         }
 
         public void SetResponse(ResponseCode code)
-            => response = new Response(code);
+        {
+            subtreesResponseCode = code;
+            response = new Response(code);
+        }
 
         public void SetResponse(ISettingsNode tree, DateTime version)
         {
-            var serialized = SerializeTree(tree, out var hash);
+            var (serialized, newMap) = SerializeTree(tree, out var hash);
+
+            this.version = version;
+            subtreesMap = newMap;
+            this.hash = hash;
+            serializedTree = serialized;
+            subtreesResponseCode = ResponseCode.Ok;
             
             response = Responses.Ok
                 .WithHeader(HeaderNames.LastModified, version.ToString("R"))
@@ -73,7 +94,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 
         public void SetPatchResponse(ISettingsNode old, ISettingsNode @new, DateTime version, bool wrongHash)
         {
-            var serialized = SerializeTree(new Patcher().GetPatch(old, @new), out _);
+            var (serialized, _) = SerializeTree(new Patcher().GetPatch(old, @new), out _);
             SerializeTree(@new, out var hash);
             
             SetPatchResponse(serialized, hash + (wrongHash ? "_WRONG_HASH" : ""), version);
@@ -81,7 +102,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         
         public void SetEmptyPatchResponse(ISettingsNode tree, DateTime version)
         {
-            var serialized = SerializeTree(new Patcher().GetPatch(tree, tree), out _);
+            var (serialized, _) = SerializeTree(new Patcher().GetPatch(tree, tree), out _);
             SerializeTree(tree, out var hash);
             
             SetPatchResponse(serialized, hash, version);
@@ -89,6 +110,10 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         
         public void SetPatchResponse(byte[] patch, string hash, DateTime version)
         {
+            this.version = version;
+            serializedPatch = patch;
+            this.hash = hash;
+            subtreesResponseCode = ResponseCode.Ok;
             response = Responses.PartialContent
                 .WithHeader(HeaderNames.LastModified, version.ToString("R"))
                 .WithHeader(HeaderNames.ContentEncoding, "gzip")
@@ -96,7 +121,12 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
                 .WithContent(patch);
         }
 
-        public void AsserRequest(Action<Uri> validate) => validate(request);
+        public void AssertRequestUrl(Action<Uri> validate) => validate(request.Url);
+
+        public void SetRecommendedProtocol(ClusterConfigProtocolVersion protocol)
+        {
+            recommendedProtocol = protocol;
+        }
 
         private void RequestHandlingLoop()
         {
@@ -110,43 +140,149 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 
         private async Task RespondAsync(HttpListenerContext context)
         {
-            request = context.Request.Url;
-            
-            context.Response.StatusCode = (int) response.Code;
+            request = context.Request;
 
-            if (response.HasHeaders)
+            if (request.Url!.AbsolutePath == "/_v3/subtrees")
             {
-                foreach (var header in response.Headers)
-                    context.Response.AddHeader(header.Name, header.Value);
+                await RespondV3(context);
             }
-
-            if (response.HasContent)
+            else
             {
-                context.Response.ContentLength64 = response.Content.Length;
+                context.Response.StatusCode = (int)response.Code;
 
-                await context.Response.OutputStream.WriteAsync(response.Content.Buffer, 0, response.Content.Length);
+                if (response.HasHeaders)
+                {
+                    foreach (var header in response.Headers)
+                        context.Response.AddHeader(header.Name, header.Value);
+                }
+
+                if (response.HasContent)
+                {
+                    context.Response.ContentLength64 = response.Content.Length;
+
+                    await context.Response.OutputStream.WriteAsync(response.Content.Buffer, 0, response.Content.Length);
+                }
             }
 
             context.Response.Close();
         }
 
-        private byte[] SerializeTree(ISettingsNode tree, out string hash)
+        private async Task RespondV3(HttpListenerContext context)
+        {
+            if (subtreesResponseCode != ResponseCode.Ok)
+            {
+                context.Response.StatusCode = (int) subtreesResponseCode;
+                return;
+            }
+            
+            var listenerRequest = context.Request;
+            var contentLength = (int)listenerRequest.ContentLength64;
+            var requestBuffer = new byte[contentLength];
+            var offset = 0;
+            int readBytes;
+            while ((readBytes = await listenerRequest.InputStream.ReadAsync(requestBuffer, offset, contentLength - offset)) > 0)
+            {
+                offset += readBytes;
+            }
+
+            var reader = new ArraySegmentReader(new ArraySegment<byte>(requestBuffer));
+            var subtreeRequests = SubtreesRequestSerializer.Deserialize(reader, Encoding.UTF8);
+            
+            var responses = GetSubtreesResponse(subtreeRequests);
+            var writer = new BinaryBufferWriter(100);
+            SubtreesResponseSerializer.Serialize(writer, responses);
+
+            context.Response.StatusCode = (int) ResponseCode.Ok;
+            
+            if (recommendedProtocol != null)
+                context.Response.AddHeader(ClusterConfigHeaderNames.RecommendedProtocol, recommendedProtocol.ToString());
+            context.Response.AddHeader(HeaderNames.LastModified, version.ToString("R"));
+            
+            context.Response.ContentLength64 = writer.Position;
+            await context.Response.OutputStream.WriteAsync(writer.Buffer, 0, (int)writer.Position);
+        }
+
+        private Dictionary<string, Subtree> GetSubtreesResponse(List<SubtreeRequest> subtreeRequests)
+        {
+            var responses = new Dictionary<string, Subtree>();
+            foreach (var subtreeRequest in subtreeRequests)
+            {
+                bool zoneModified = false;
+                bool hasSubtree = false;
+                bool isPatch = false;
+                bool isCompressed = false;
+                ArraySegment<byte> value = default;
+
+                //(deniaa): Subtree was modified since previous version (or client send his first request).
+                if (!subtreeRequest.Version.HasValue || (zoneModified = subtreeRequest.Version.Value < version))
+                {
+                    zoneModified = true;
+                    //(deniaa): While we support patches only for full zone we handle exactly this case separately.
+                    //(deniaa): Also we have a special logic to fallback to the root and we don't want to compress it on each request 
+                    if (subtreeRequest.Prefix == "" || subtreeRequest.Prefix == "/")
+                    {
+                        if (!subtreeRequest.ForceFullUpdate && !HasReasonToFullUpdate(subtreeRequest.Version))
+                        {
+                            //(deniaa): Patch is always compressed
+                            isCompressed = true;
+                            isPatch = true;
+                            hasSubtree = true;
+                            value = new ArraySegment<byte>(serializedPatch);
+                        }
+                        else
+                        {
+                            isCompressed = true;
+                            hasSubtree = true;
+                            value = new ArraySegment<byte>(serializedTree);
+                        }
+                    }
+                    //(deniaa): Other subtrees we handle as a full zone due to their small size (we believe).
+                    else
+                    {
+                        //(deniaa): Here we assume that all prefixes in requests are normalized: no leading slashes, no slash sequences.
+                        //(deniaa): This is guaranteed by code in ClusterConfig.Client. 
+                        hasSubtree = subtreesMap.TryGetValue(subtreeRequest.Prefix, out value);
+                    }
+                }
+
+
+                responses.Add(subtreeRequest.Prefix, new Subtree(zoneModified, hasSubtree, isPatch, isCompressed, value));
+            }
+
+            return responses;
+        }
+
+        private bool HasReasonToFullUpdate(DateTime? subtreeRequestVersion)
+        {
+            return subtreeRequestVersion == null || serializedPatch == null;
+        }
+
+        private (byte[], Dictionary<string, ArraySegment<byte>>) SerializeTree(ISettingsNode tree, out string hash)
         {
             var writer = new BinaryBufferWriter(64);
 
             protocol.GetSerializer(new RecyclingBoundedCache<string, string>(4)).Serialize(tree, writer);
 
             hash = writer.Buffer.GetSha256Str(0, writer.Length);
-            
-            var buffer = new MemoryStream();
 
-            using (var gzip = new GZipStream(buffer, CompressionMode.Compress))
+            var map = new Dictionary<string, ArraySegment<byte>>();
+            if (protocol != ClusterConfigProtocolVersion.V1)
+            {
+                var buffer = new byte[writer.Length];
+                Buffer.BlockCopy(writer.Buffer, 0, buffer, 0, writer.Length);
+                var nodeReader = new SubtreesMapBuilder(new ArraySegmentReader(new ArraySegment<byte>(buffer)), Encoding.UTF8, null);
+                map = nodeReader.BuildMap();
+            }
+
+            var stream = new MemoryStream();
+
+            using (var gzip = new GZipStream(stream, CompressionMode.Compress))
             {
                 gzip.Write(writer.Buffer, 0, writer.Length);
                 gzip.Flush();
             }
 
-            return buffer.ToArray();
+            return (stream.ToArray(), map);
         }
     }
 }
