@@ -664,6 +664,23 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             log.Received().Log(Arg.Is<LogEvent>(e => e.Level == LogLevel.Info && e.MessageTemplate == UpdatedTemplate && e.Properties["IsPatch"].ToString() == "True"));
         }
 
+        [Test]
+        [Repeat(10)]
+        //(deniaa): There were a races between several observables even in sequential call. This probability test check that we have no such races.
+        public void Test_V3_sequential_observe()
+        {
+            server.SetResponse(remoteTree1, version1);
+
+            var fooObs = client.Observe("foo");
+            fooObs.WaitFirstValue(5.Seconds()).Should().Be(remoteTree1["foo"]);
+            
+            var barObs = client.Observe("bar");
+            barObs.WaitFirstValue(5.Seconds()).Should().Be(remoteTree1["bar"]);
+            
+            var bazObs = client.Observe("baz");
+            bazObs.WaitFirstValue(5.Seconds()).Should().Be(remoteTree1["baz"]);
+        }
+
         private void ModifySettings(Action<ClusterConfigClientSettings> modify)
         {
             modify(settings);
