@@ -84,7 +84,7 @@ internal class FunctionalTests_V3_RecommendedProtocol
     [TestCase(ClusterConfigProtocolVersion.V1)]
     [TestCase(ClusterConfigProtocolVersion.V2)]
     [TestCase(ClusterConfigProtocolVersion.V3)]
-    public void T(ClusterConfigProtocolVersion protocol)
+    public void Client_should_be_able_to_downgrade_to_recommended_protocol(ClusterConfigProtocolVersion protocol)
     {
         server.SetResponse(remoteTree1, version1);
 
