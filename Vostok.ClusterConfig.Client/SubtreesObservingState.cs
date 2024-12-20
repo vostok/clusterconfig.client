@@ -80,13 +80,12 @@ internal class SubtreesObservingState
     public void FinalizeSubtrees(
         IEnumerable<ObservingSubtree> observingSubtreesToFinalize,
         DateTime? dateTime,
-        CachingObservable<ClusterConfigClientState> stateObservable,
-        Task propagationTask,
+        Task<CachingObservable<ClusterConfigClientState>> rootObservablePropagationTask,
         CancellationToken cancellationToken)
     {
         var finalizationAction = new Action<ObservingSubtree>(subtreeToFinalize =>
         {
-            subtreeToFinalize.FinalizeSubtree(stateObservable, propagationTask, cancellationToken);
+            subtreeToFinalize.FinalizeSubtree(rootObservablePropagationTask, cancellationToken);
         });
 
         foreach (var subtreeToFinalize in observingSubtreesToFinalize)

@@ -53,17 +53,17 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         [SetUp]
         public void TestSetup()
         {
+            log = Substitute.For<ILog>();
+            log.IsEnabledFor(Arg.Any<LogLevel>()).ReturnsForAnyArgs(true);
+            log.ForContext(Arg.Any<string>()).ReturnsForAnyArgs(log);
+            log.IsEnabledFor(LogLevel.Info).Should().BeTrue();
+            
             folder = new TestFolder();
 
             server = new TestServer(protocol);
             server.Start();
 
             observer = new TestObserver<(ISettingsNode, long)>();
-
-            log = Substitute.For<ILog>();
-            log.IsEnabledFor(Arg.Any<LogLevel>()).ReturnsForAnyArgs(true);
-            log.ForContext(Arg.Any<string>()).ReturnsForAnyArgs(log);
-            log.IsEnabledFor(LogLevel.Info).Should().BeTrue();
 
             settings = new ClusterConfigClientSettings
             {
@@ -337,18 +337,21 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 
         [Test]
         public void Should_retry_initial_remote_update()
-        {
+        {   
+            var b = () =>
+            {
+                client.Get(ClusterConfigPath.Empty).Should().NotBeNull();
+            };
+            b.Should().Throw<ClusterConfigClientException>();
+            
             Task.Delay(5.Seconds()).ContinueWith(_ => server.SetResponse(remoteTree1, version1));
 
             var a = () =>
             {
-                var b = () =>
-                {
-                    client.Get(ClusterConfigPath.Empty).Should().NotBeNull();
-                };
                 b.Should().NotThrow();
             };
-            a.ShouldNotFailIn(10.Seconds());
+            //(deniaa): As we set http-timeout = 10 seconds and client used strategies with retry which can consume whole timeout, we definitely should give him two "attempts" (20 seconds). 
+            a.ShouldPassIn(20.Seconds());
         }
 
         [Test]

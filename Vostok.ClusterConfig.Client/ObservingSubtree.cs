@@ -30,7 +30,7 @@ internal class ObservingSubtree
 
     public TaskCompletionSource<bool> GetTaskCompletionSource() => atLeastOnceObtaining;
 
-    public void FinalizeSubtree(CachingObservable<ClusterConfigClientState> stateObservable, Task propagationTask, CancellationToken cancellationToken)
+    public void FinalizeSubtree(Task<CachingObservable<ClusterConfigClientState>> rootObservablePropagationTask, CancellationToken cancellationToken)
     {
         var needToSubscribe = false;
         //If the first attempt to update a subtree fails, we must recreate the task so that the next Get(path) succeeds.
@@ -53,7 +53,7 @@ internal class ObservingSubtree
         {
             Task.Run(async () =>
             {
-                await propagationTask.ConfigureAwait(false);
+                var stateObservable = await rootObservablePropagationTask.ConfigureAwait(false);
                 lock (observablePropagationLock)
                 {
                     if (SubtreeStateObservable.IsCompleted)

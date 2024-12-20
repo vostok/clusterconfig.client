@@ -264,11 +264,11 @@ namespace Vostok.ClusterConfig.Client
                     if (currentState == null || localUpdateResult.Changed || remoteUpdateResult.Changed)
                     {
                         var newState = CreateNewState(currentState, localUpdateResult, remoteUpdateResult);
-                        var propagationTask = PropagateNewState(newState, observingSubtrees, cancellationToken);
+                        var rootObservablePropagationTask = PropagateNewState(newState, observingSubtrees, cancellationToken);
                         
                         //(deniaa): We could make a version for each subtree and change it only if content have changed.
                         //(deniaa): So as not to do useless changes of unchanged subtree if zone has changed elsewhere.
-                        subtreesObservingState.FinalizeSubtrees(observingSubtrees, remoteUpdateResult.Version, stateObservable, propagationTask, cancellationToken);
+                        subtreesObservingState.FinalizeSubtrees(observingSubtrees, remoteUpdateResult.Version, rootObservablePropagationTask, cancellationToken);
                     }
 
 
@@ -351,7 +351,7 @@ namespace Vostok.ClusterConfig.Client
             return new ClusterConfigClientState(newLocalTree, newRemoteSubtrees, newCaches, newVersion);
         }
 
-        private Task PropagateNewState(
+        private Task<CachingObservable<ClusterConfigClientState>> PropagateNewState(
             [NotNull] ClusterConfigClientState state, 
             List<ObservingSubtree> observingSubtrees, 
             CancellationToken cancellationToken)
@@ -360,7 +360,11 @@ namespace Vostok.ClusterConfig.Client
             {
                 // (iloktionov): No point in overwriting ObjectDisposedException stored in 'stateSource' in case the client was disposed.
                 if (cancellationToken.IsCancellationRequested)
-                    return Task.CompletedTask;
+                {
+                    var faultedObs = new CachingObservable<ClusterConfigClientState>();
+                    faultedObs.Error(new ObjectDisposedException(GetType().Name));
+                    return Task.FromResult(faultedObs);
+                }
 
                 var newStateSource = new TaskCompletionSource<ClusterConfigClientState>(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -383,6 +387,8 @@ namespace Vostok.ClusterConfig.Client
 
                         if (ReferenceEquals(state, GetCurrentState()))
                             stateObservable.Next(state);
+                        
+                        return stateObservable;
                     }
                 });
         }
