@@ -250,7 +250,7 @@ public class SubtreesObservingState_Tests
         
         state.TryAddSubtree("foo/baz", out var bazTcs, out var bazCachingObservable).Should().BeTrue();
         subtreesToRequest = state.GetSubtreesToRequest();
-        state.FailUnfinalizedSubtrees(subtreesToRequest, false, new Exception(), Task.CompletedTask);
+        state.FailUnfinalizedSubtrees(subtreesToRequest, new Exception(), Task.CompletedTask);
         bazTcs.Task.IsFaulted.Should().BeTrue();
         
         var bazObs = new TestObserver<ClusterConfigClientState>();
