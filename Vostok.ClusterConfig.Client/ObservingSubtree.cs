@@ -61,13 +61,16 @@ internal class ObservingSubtree
                 lock (observablePropagationLock)
                 {
                     if (SubtreeStateObservable.IsCompleted)
+                    {
                         SubtreeStateObservable = new CachingObservable<ClusterConfigClientState>();
-
-                    var newSubscription = stateObservable.Subscribe(new TransmittingObserver(SubtreeStateObservable));
-                    if (!ReferenceEquals(newSubscription, lastSubscription))
                         lastSubscription?.Dispose();
+                        lastSubscription = null;
+                    }
 
-                    lastSubscription = newSubscription;
+                    if (lastSubscription != null)
+                        return;
+                    
+                    lastSubscription = stateObservable.Subscribe(new TransmittingObserver(SubtreeStateObservable));
                 }
             });
         }
