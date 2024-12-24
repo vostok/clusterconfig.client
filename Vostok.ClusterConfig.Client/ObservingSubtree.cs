@@ -10,7 +10,7 @@ internal class ObservingSubtree
 {
     private readonly object observablePropagationLock;
     private IDisposable lastSubscription;
-    private TaskCompletionSource<bool> atLeastOnceObtaining;
+    private volatile TaskCompletionSource<bool> atLeastOnceObtaining;
 
     public ObservingSubtree(ClusterConfigPath path)
     {
@@ -26,9 +26,13 @@ internal class ObservingSubtree
     public CachingObservable<ClusterConfigClientState> SubtreeStateObservable { get; private set; }
     public DateTime? LastVersion { get; set; }
 
-    public bool IsFinalized() => atLeastOnceObtaining.Task.IsCompleted && !atLeastOnceObtaining.Task.IsFaulted;
+    public bool IsFinalized()
+    {
+        var cachedAtLeastOnceObtaining = atLeastOnceObtaining;
+        return cachedAtLeastOnceObtaining.Task.IsCompleted && !cachedAtLeastOnceObtaining.Task.IsFaulted;
+    }
 
-    public TaskCompletionSource<bool> GetTaskCompletionSource() => atLeastOnceObtaining;
+    public TaskCompletionSource<bool> GetAtLeastOnceObtainingTaskCompletionSource() => atLeastOnceObtaining;
 
     public void FinalizeSubtree(Task<CachingObservable<ClusterConfigClientState>> rootObservablePropagationTask, CancellationToken cancellationToken)
     {
@@ -41,11 +45,11 @@ internal class ObservingSubtree
             if (cancellationToken.IsCancellationRequested)
                 return;
 
-            var newStateSource = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var newAtLeastOnceObtainingSource = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            newStateSource.SetResult(true);
+            newAtLeastOnceObtainingSource.SetResult(true);
 
-            Interlocked.Exchange(ref atLeastOnceObtaining, newStateSource);
+            Interlocked.Exchange(ref atLeastOnceObtaining, newAtLeastOnceObtainingSource);
             needToSubscribe = true;
         }
 
@@ -59,14 +63,17 @@ internal class ObservingSubtree
                     if (SubtreeStateObservable.IsCompleted)
                         SubtreeStateObservable = new CachingObservable<ClusterConfigClientState>();
 
-                    lastSubscription?.Dispose();
-                    lastSubscription = stateObservable.Subscribe(new TransmittingObserver(SubtreeStateObservable));
+                    var newSubscription = stateObservable.Subscribe(new TransmittingObserver(SubtreeStateObservable));
+                    if (!ReferenceEquals(newSubscription, lastSubscription))
+                        lastSubscription?.Dispose();
+
+                    lastSubscription = newSubscription;
                 }
             });
         }
     }
 
-    public void FailUnfinalizedSubtrees(Exception error, bool alwaysPushToObservable, Task propagationTask)
+    public void FailUnfinalizedSubtree(Exception error, bool alwaysPushToObservable, Task propagationTask)
     {
         var pushedToSource = atLeastOnceObtaining.TrySetException(error);
         if (pushedToSource || alwaysPushToObservable)

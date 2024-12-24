@@ -287,7 +287,7 @@ namespace Vostok.ClusterConfig.Client
                     if (currentState == null)
                         errorPropagatingTask = PropagateError(error, false);
                     if (observingSubtrees != null)
-                        subtreesObservingState.FailUnfinalizedSubtrees(observingSubtrees, false, error, errorPropagatingTask);
+                        subtreesObservingState.FailUnfinalizedSubtrees(observingSubtrees, error, errorPropagatingTask);
                 }
 
                 await Task.WhenAny(Task.Delay(budget.Remaining, cancellationToken), immediatelyUpdateCompletionSource.Task).ConfigureAwait(false);

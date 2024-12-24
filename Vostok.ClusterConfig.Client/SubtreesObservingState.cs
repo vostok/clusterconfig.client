@@ -103,13 +103,12 @@ internal class SubtreesObservingState
 
     public void FailUnfinalizedSubtrees(
         IEnumerable<ObservingSubtree> observingSubtreesToFinalize,
-        bool alwaysPushToObservable,
         Exception error,
         Task propagationTask)
     {        
         var finalizationAction = new Action<ObservingSubtree>(subtreeToFinalize =>
         {
-            subtreeToFinalize.FailUnfinalizedSubtrees(error, alwaysPushToObservable, propagationTask);
+            subtreeToFinalize.FailUnfinalizedSubtree(error, false, propagationTask);
         });
         
         foreach (var subtreeToFinalize in observingSubtreesToFinalize)
@@ -117,7 +116,7 @@ internal class SubtreesObservingState
             if (subtreeToFinalize.IsFinalized())
                 continue;
 
-            subtreeToFinalize.FailUnfinalizedSubtrees(error, alwaysPushToObservable, propagationTask);
+            finalizationAction(subtreeToFinalize);
 
             CleanupLeafSubtrees(subtreeToFinalize, finalizationAction);
         }
@@ -168,7 +167,7 @@ internal class SubtreesObservingState
             
             observingSubtrees = newSubtrees;
 
-            taskCompletionSource = newObservingSubtree.GetTaskCompletionSource();
+            taskCompletionSource = newObservingSubtree.GetAtLeastOnceObtainingTaskCompletionSource();
             stateObservable = newObservingSubtree.SubtreeStateObservable;
             return true;
         }
@@ -233,7 +232,7 @@ internal class SubtreesObservingState
         {
             if (!observingSubtree.Path.IsPrefixOf(newSubtree))
                 continue;
-            taskCompletionSource = observingSubtree.GetTaskCompletionSource();
+            taskCompletionSource = observingSubtree.GetAtLeastOnceObtainingTaskCompletionSource();
             stateObservable = observingSubtree.SubtreeStateObservable;
             return true;
         }
@@ -249,7 +248,7 @@ internal class SubtreesObservingState
             
             foreach (var observingSubtree in observingSubtrees)
             {
-                observingSubtree.FailUnfinalizedSubtrees(error, alwaysPushToObservable, propagationTask);
+                observingSubtree.FailUnfinalizedSubtree(error, alwaysPushToObservable, propagationTask);
             }
         }
     }
