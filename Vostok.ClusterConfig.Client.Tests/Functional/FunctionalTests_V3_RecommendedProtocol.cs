@@ -30,7 +30,7 @@ internal class FunctionalTests_V3_RecommendedProtocol
     [SetUp]
     public void TestSetup()
     {
-        server = new TestServer(ClusterConfigProtocolVersion.V3);
+        server = new TestServer(ClusterConfigProtocolVersion.V3_1);
         server.Start();
 
         observer = new TestObserver<(ISettingsNode, long)>();
@@ -84,6 +84,7 @@ internal class FunctionalTests_V3_RecommendedProtocol
     [TestCase(ClusterConfigProtocolVersion.V1)]
     [TestCase(ClusterConfigProtocolVersion.V2)]
     [TestCase(ClusterConfigProtocolVersion.V3)]
+    [TestCase(ClusterConfigProtocolVersion.V3_1)]
     public void Client_should_be_able_to_downgrade_to_recommended_protocol(ClusterConfigProtocolVersion protocol)
     {
         server.SetResponse(remoteTree1, version1);

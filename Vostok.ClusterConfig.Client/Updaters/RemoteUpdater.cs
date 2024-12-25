@@ -164,7 +164,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
 
         private Request CreateRequest(List<ObservingSubtree> observingSubtrees, ClusterConfigProtocolVersion protocol, DateTime? lastVersion, bool protocolChanged, PatchingFailedReason? patchingFailedReason)
         {
-            var withContent = protocol == ClusterConfigProtocolVersion.V3;
+            var withContent = protocol is ClusterConfigProtocolVersion.V3 or ClusterConfigProtocolVersion.V3_1;
             var urlPath = protocol.GetUrlPath();
             var request = withContent ? Request.Post(urlPath) : Request.Get(urlPath);
                 
@@ -293,7 +293,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             var serializer = protocol.GetSerializer(interningCache);
             var description = GetDescription(response);
 
-            if (protocol == ClusterConfigProtocolVersion.V3)
+            if (protocol is ClusterConfigProtocolVersion.V3 or ClusterConfigProtocolVersion.V3_1)
             {
                 //(deniaa): Until we override BufferFactory for transport and create a buffer for gzip decompression, each Content is a new byte array. So we can refer to subsequences of it.
                 var responseContent = response.Content.ToArraySegment();

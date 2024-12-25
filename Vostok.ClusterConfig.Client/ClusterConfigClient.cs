@@ -242,7 +242,7 @@ namespace Vostok.ClusterConfig.Client
 
                 var budget = TimeBudget.StartNew(settings.UpdatePeriod);
 
-                if (protocol != ClusterConfigProtocolVersion.V3)
+                if (protocol < ClusterConfigProtocolVersion.V3)
                     subtreesObservingState.TryAddSubtree(new ClusterConfigPath(""), out _, out _);
                 var observingSubtrees = subtreesObservingState.GetSubtreesToRequest();
 
