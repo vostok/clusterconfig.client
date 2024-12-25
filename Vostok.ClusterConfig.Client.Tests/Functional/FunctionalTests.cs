@@ -24,7 +24,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 {
     [TestFixture(ClusterConfigProtocolVersion.V1)]
     [TestFixture(ClusterConfigProtocolVersion.V2)]
-    [TestFixture(ClusterConfigProtocolVersion.V3)]
+    [TestFixture(ClusterConfigProtocolVersion.V3_1)]
     internal class FunctionalTests
     {
         private const string UpdatedTemplate = "Received new version of zone '{Zone}' from {Replica}. Size = {Size}. Version = {Version}. Protocol = {Protocol}. Patch = {IsPatch}. {ResponsesDescriptions}.";

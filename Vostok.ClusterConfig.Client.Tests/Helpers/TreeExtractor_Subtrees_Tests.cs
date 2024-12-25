@@ -21,7 +21,7 @@ internal class TreeExtractor_Subtrees_Tests
     private ISettingsNode remoteTree;
     private ISettingsNode localTree;
     private HashSet<string> observingSubtrees;
-    private const ClusterConfigProtocolVersion Protocol = ClusterConfigProtocolVersion.V3;
+    private const ClusterConfigProtocolVersion Protocol = ClusterConfigProtocolVersion.V3_1;
 
     [SetUp]
     public void SetUp()
