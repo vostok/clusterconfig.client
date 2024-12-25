@@ -142,7 +142,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         {
             request = context.Request;
 
-            if (request.Url!.AbsolutePath == "/_v3/subtrees")
+            if (request.Url!.AbsolutePath == "/_v3_1/subtrees")
             {
                 await RespondV3(context);
             }
