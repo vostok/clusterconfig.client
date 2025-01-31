@@ -1,3 +1,8 @@
+## 0.2.29 (31-01-2025):
+
+Fix a race between two Tasks: one from first initial observable subscribing and second from propagating new state for just subscribed observers.
+Fix a bug with handling empty patches.
+
 ## 0.2.27 (16-12-2024): 
 
 Bump NuGet deps versions
