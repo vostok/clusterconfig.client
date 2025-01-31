@@ -17,7 +17,7 @@ notests *default:
     - vostok.configuration.abstractions
     - vostok.configuration.sources
     - vostok.clusterconfig.client.abstractions
-    - vostok.clusterconfig.core/src@subtrees-protocol-bugfix2
+    - vostok.clusterconfig.core/src
     - vostok.commons.collections/src
     - vostok.commons.helpers/src
     - vostok.commons.threading/src
@@ -25,8 +25,7 @@ notests *default:
 
 full-build > notests:
   deps:
-    - -vostok.devtools
-    - vostok.devtools@with-net6.0
+    - vostok.devtools
     - vostok.logging.console
     - vostok.commons.testing/src
 
