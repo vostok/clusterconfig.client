@@ -25,7 +25,7 @@ namespace Vostok.ClusterConfig.Client
 
         public const int InternedValuesCacheCapacity = 0;
 
-        public const int MaximumSubtrees = 30;
+        public const int MaximumSubtrees = 100;
 
         public const int MaximumFileSize = 1024 * 1024;
 

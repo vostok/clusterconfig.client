@@ -6,7 +6,7 @@
     <Configurations>Debug;Release</Configurations>
   </PropertyGroup>
   <PropertyGroup>
-    <VersionPrefix>0.2.28</VersionPrefix>
+    <VersionPrefix>0.2.29</VersionPrefix>
   </PropertyGroup>
   <PropertyGroup>
     <Title>Vostok.ClusterConfig.Client</Title>
@@ -51,7 +51,7 @@
     <Compile Include="..\..\vostok.commons.time\Vostok.Commons.Time\TimeBudget.cs" Link="Commons\TimeBudget.cs" />
     <Compile Include="..\..\vostok.commons.helpers\Vostok.Commons.Helpers\Observable\CachingObservable.cs" Link="Commons\CachingObservable.cs" />
   </ItemGroup>
-  <Import Project="..\..\vostok.commons.binary\BinaryBufferReader.props" Condition="Exists('..\..\vostok.commons.binary\BinaryBufferReader.props')" />
+  <Import Project="..\..\vostok.commons.binary\ArraySegmentReader.props" Condition="Exists('..\..\vostok.commons.binary\ArraySegmentReader.props')" />
   <Import Project="..\..\vostok.commons.binary\BinaryBufferWriter.props" Condition="Exists('..\..\vostok.commons.binary\BinaryBufferWriter.props')" />
   <Import Project="..\..\vostok.clusterconfig.core\Vostok.ClusterConfig.Core.props" Condition="Exists('..\..\vostok.clusterconfig.core\Vostok.ClusterConfig.Core.props')" />
 </Project>

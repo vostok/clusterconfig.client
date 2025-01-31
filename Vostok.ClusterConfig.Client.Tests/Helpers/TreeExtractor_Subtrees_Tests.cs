@@ -21,7 +21,7 @@ internal class TreeExtractor_Subtrees_Tests
     private ISettingsNode remoteTree;
     private ISettingsNode localTree;
     private HashSet<string> observingSubtrees;
-    private const ClusterConfigProtocolVersion Protocol = ClusterConfigProtocolVersion.V3;
+    private const ClusterConfigProtocolVersion Protocol = ClusterConfigProtocolVersion.V3_1;
 
     [SetUp]
     public void SetUp()
@@ -134,7 +134,7 @@ internal class TreeExtractor_Subtrees_Tests
                 
                 treeSerializer.Serialize(remoteTree, writer);
                 
-                var nodeReader = new SubtreesMapBuilder(new BinaryBufferReader(writer.Buffer, 0), Encoding.UTF8, null);
+                var nodeReader = new SubtreesMapBuilder(new ArraySegmentReader(new ArraySegment<byte>(writer.Buffer)), Encoding.UTF8, null);
                 var map = nodeReader.BuildMap();
 
                 var dictionary = new Dictionary<ClusterConfigPath, RemoteTree>();

@@ -1,3 +1,4 @@
+using System;
 using JetBrains.Annotations;
 
 namespace Vostok.ClusterConfig.Client
@@ -21,9 +22,15 @@ namespace Vostok.ClusterConfig.Client
         V2 = 2,
         
         /// <summary>
+        /// Never use this version. Left for backward compatibility in cement. Use <see cref="V3_1"/> isntead.
+        /// </summary>
+        [Obsolete]
+        V3 = 3,
+        
+        /// <summary>
         /// Third binary protocol. Send requests for subtrees instead full zone.
         /// Rollback to whole zone requests if requested too many subtrees.
         /// </summary>
-        V3 = 3
+        V3_1 = 4,
     }
 }

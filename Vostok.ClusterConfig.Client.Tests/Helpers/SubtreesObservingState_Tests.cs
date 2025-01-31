@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reactive;
+using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using FluentAssertions.Extensions;
@@ -48,10 +50,14 @@ public class SubtreesObservingState_Tests
         cachingObservable.Subscribe(obs);
         new Action(() => obs.Values.Should().BeEmpty()).ShouldNotFailIn(5.Seconds());
         
-        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, observable);
+        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, Task.FromResult(observable), CancellationToken.None);
         tcs.Task.IsCompleted.Should().BeTrue();
         tcs.Task.GetAwaiter().GetResult().Should().BeTrue();
-        new Action(() => obs.Values.LastOrDefault().Should().Be(result)).ShouldPassIn(10.Seconds());
+        new Action(() =>
+        {
+            obs.Values.Should().HaveCount(1);
+            obs.Values.Single().Should().BeSameAs(result);
+        }).ShouldPassIn(10.Seconds());
     }
     
     [Test]
@@ -61,7 +67,7 @@ public class SubtreesObservingState_Tests
         
         state.TryAddSubtree(path, out var tcs, out _).Should().BeTrue();
         var subtreesToRequest = state.GetSubtreesToRequest();
-        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, observable);
+        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, Task.FromResult(observable), CancellationToken.None);
         tcs.Task.IsCompleted.Should().BeTrue();
         tcs.Task.GetAwaiter().GetResult().Should().BeTrue();
 
@@ -72,7 +78,11 @@ public class SubtreesObservingState_Tests
             tcs.Task.GetAwaiter().GetResult().Should().BeTrue();
             var obs = new TestObserver<ClusterConfigClientState>();
             newCachingObservable.Subscribe(obs);
-            new Action(() => obs.Values.LastOrDefault().Should().Be(result)).ShouldPassIn(10.Seconds());
+            new Action(() =>
+            {
+                obs.Values.Should().HaveCount(1);
+                obs.Values.Single().Should().BeSameAs(result);
+            }).ShouldPassIn(10.Seconds());
         }
     }
     
@@ -96,7 +106,7 @@ public class SubtreesObservingState_Tests
         
         subtreesToRequest.Single().Path.Should().Be(path);
         
-        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, observable);
+        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, Task.FromResult(observable), CancellationToken.None);
         
         tcs.Task.IsCompleted.Should().BeTrue();
         nestedTcs.Task.IsCompleted.Should().BeTrue();
@@ -106,8 +116,11 @@ public class SubtreesObservingState_Tests
         nestedCachingObservable.Subscribe(nestedObs);
         new Action(() =>
         {
-            obs.Values.LastOrDefault().Should().Be(result);
-            nestedObs.Values.LastOrDefault().Should().Be(result);
+            obs.Values.Should().HaveCount(1);
+            obs.Values.Single().Should().BeSameAs(result);
+            
+            nestedObs.Values.Should().HaveCount(1);
+            nestedObs.Values.Single().Should().BeSameAs(result);
         }).ShouldPassIn(10.Seconds());
     }
     
@@ -131,7 +144,7 @@ public class SubtreesObservingState_Tests
         
         subtreesToRequest.Single().Path.Should().Be(path);
         
-        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, observable);
+        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, Task.FromResult(observable), CancellationToken.None);
         
         tcs.Task.IsCompleted.Should().BeTrue();
         nestedTcs.Task.IsCompleted.Should().BeTrue();
@@ -142,8 +155,11 @@ public class SubtreesObservingState_Tests
         nestedCachingObservable.Subscribe(nestedObs);
         new Action(() =>
         {
-            obs.Values.LastOrDefault().Should().Be(result);
-            nestedObs.Values.LastOrDefault().Should().Be(result);
+            obs.Values.Should().HaveCount(1);
+            obs.Values.Single().Should().BeSameAs(result);
+            
+            nestedObs.Values.Should().HaveCount(1);
+            nestedObs.Values.Single().Should().BeSameAs(result);
         }).ShouldPassIn(10.Seconds());
     }
     
@@ -172,7 +188,7 @@ public class SubtreesObservingState_Tests
         var subtreesToRequest = state.GetSubtreesToRequest();
         subtreesToRequest.Single().Path.Should().Be(new ClusterConfigPath(""));
         
-        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, observable);
+        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, Task.FromResult(observable), CancellationToken.None);
         
         rootTcs.Task.IsCompleted.Should().BeTrue();
         foreach (var tcs in tcss)
@@ -184,12 +200,14 @@ public class SubtreesObservingState_Tests
     {
         state.TryAddSubtree("foo/bar", out _, out var subtreeCachingObservable).Should().BeTrue();
         var subtreesToRequest = state.GetSubtreesToRequest();
-        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, observable);        
+        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, Task.FromResult(observable), CancellationToken.None);
+        
         var subtreeObs = new TestObserver<ClusterConfigClientState>();
         subtreeCachingObservable.Subscribe(subtreeObs);
         new Action(() =>
         {
-            subtreeObs.Values.LastOrDefault().Should().BeSameAs(result);
+            subtreeObs.Values.Should().HaveCount(1);
+            subtreeObs.Values.Single().Should().BeSameAs(result);
         }).ShouldPassIn(10.Seconds());
         
         state.TryAddSubtree("foo", out _, out var rootCachingObservable).Should().BeTrue();
@@ -197,7 +215,7 @@ public class SubtreesObservingState_Tests
         subtreesToRequest.Should().HaveCount(1);
         subtreesToRequest.Single().Path.Equivalent(new ClusterConfigPath("foo")).Should().BeTrue();
         
-        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, observable);
+        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, Task.FromResult(observable), CancellationToken.None);
 
         var newState = new ClusterConfigClientState(null, null, new RecyclingBoundedCache<ClusterConfigPath, ISettingsNode>(11), 77);
         observable.Next(newState);
@@ -206,8 +224,65 @@ public class SubtreesObservingState_Tests
         rootCachingObservable.Subscribe(rootObs);
         new Action(() =>
         {
+            subtreeObs.Values.Should().HaveCount(2);
             subtreeObs.Values.LastOrDefault().Should().BeSameAs(newState);
-            rootObs.Values.LastOrDefault().Should().BeSameAs(newState);
+            
+            rootObs.Values.Should().HaveCount(1);
+            rootObs.Values.Single().Should().BeSameAs(newState);
+        }).ShouldPassIn(10.Seconds());
+    }
+
+    [Test]
+    public void Fail_tests()
+    {
+        state.TryAddSubtree("foo/bar", out _, out var barCachingObservable).Should().BeTrue();
+        var subtreesToRequest = state.GetSubtreesToRequest();
+        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, Task.FromResult(observable), CancellationToken.None);
+        
+        var barObs = new TestObserver<ClusterConfigClientState>();
+        barCachingObservable.Subscribe(barObs);
+        new Action(() =>
+        {
+            barObs.Values.Should().HaveCount(1);
+            barObs.Values.Single().Should().BeSameAs(result);
+        }).ShouldPassIn(10.Seconds());
+        
+        
+        state.TryAddSubtree("foo/baz", out var bazTcs, out var bazCachingObservable).Should().BeTrue();
+        subtreesToRequest = state.GetSubtreesToRequest();
+        state.FailUnfinalizedSubtrees(subtreesToRequest, new Exception(), Task.CompletedTask);
+        bazTcs.Task.IsFaulted.Should().BeTrue();
+        
+        var bazObs = new TestObserver<ClusterConfigClientState>();
+        bazCachingObservable.Subscribe(bazObs);
+        new Action(() =>
+        {
+            bazObs.Messages.Should().HaveCount(1);
+            bazObs.Messages.Single().Kind.Should().Be(NotificationKind.OnError);
+            bazObs.Messages.Single().Exception.Should().NotBeNull();
+            bazObs.Messages.Single().HasValue.Should().BeFalse();
+        }).ShouldPassIn(10.Seconds());
+        
+
+        var newSubtreesToRequest = state.GetSubtreesToRequest();
+        newSubtreesToRequest.Should().BeEquivalentTo(subtreesToRequest);
+        
+        var newState = new ClusterConfigClientState(null, null, new RecyclingBoundedCache<ClusterConfigPath, ISettingsNode>(11), 77);
+        observable.Next(newState);
+        state.FinalizeSubtrees(newSubtreesToRequest, DateTime.UtcNow, Task.FromResult(observable), CancellationToken.None);
+        
+
+        new Action(() =>
+        {
+            state.TryAddSubtree("foo/baz", out var newBazTcs, out var newBazCachingObservable).Should().BeFalse();
+            newBazTcs.Task.IsCompleted.Should().BeTrue();
+            var newBazObs = new TestObserver<ClusterConfigClientState>();
+            newBazCachingObservable.Subscribe(newBazObs);
+            
+            newBazObs.Messages.Should().HaveCount(1);
+            newBazObs.Messages.Single().Kind.Should().Be(NotificationKind.OnNext);
+            newBazObs.Values.Should().HaveCount(1);
+            newBazObs.Values.Single().Should().BeSameAs(newState);
         }).ShouldPassIn(10.Seconds());
     }
 
@@ -221,7 +296,7 @@ public class SubtreesObservingState_Tests
         for (var i = 0; i < 10; i++)
         {
             var subtreesToRequest = state.GetSubtreesToRequest();
-            state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, observable);
+            state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, Task.FromResult(observable), CancellationToken.None);
         }
 
         new Action(() => subtreeObs.Values.Should().HaveCount(1)).ShouldPassIn(10.Seconds());
@@ -252,6 +327,24 @@ public class SubtreesObservingState_Tests
 
         var subtreesToRequest = state.GetSubtreesToRequest();
         subtreesToRequest.Count.Should().Be(3);
+    }
+
+    [Test]
+    public void Observable_should_become_cancelled_if_Finalize_with_cancelled_root_obs()
+    {
+        state.TryAddSubtree("foo/bar", out _, out var subtreeCachingObservable).Should().BeTrue();
+        var subtreesToRequest = state.GetSubtreesToRequest();
+        var failedObs = new CachingObservable<ClusterConfigClientState>();
+        failedObs.Error(new ObjectDisposedException("blah"));
+        state.FinalizeSubtrees(subtreesToRequest, DateTime.UtcNow, Task.FromResult(failedObs), CancellationToken.None);
+        
+        var subtreeObs = new TestObserver<ClusterConfigClientState>();
+        subtreeCachingObservable.Subscribe(subtreeObs);
+        new Action(() =>
+        {
+            subtreeObs.Messages.Should().HaveCount(1);
+            subtreeObs.Messages.Single().Kind.Should().Be(NotificationKind.OnError);
+        }).ShouldPassIn(10.Seconds());    
     }
 
     private void TryAdd(string[] prefixes, int offset, int length)

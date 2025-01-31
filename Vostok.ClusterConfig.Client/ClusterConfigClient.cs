@@ -128,9 +128,10 @@ namespace Vostok.ClusterConfig.Client
             {
                 cancellationSource.Cancel();
 
-                PropagateError(new ObjectDisposedException(GetType().Name), true);
+                var error = new ObjectDisposedException(GetType().Name);
+                var errorPropagationTask = PropagateError(error, true);
                 
-                subtreesObservingState.Cancel(stateObservable);
+                subtreesObservingState.Cancel(error, true, errorPropagationTask);
             }
         }
 
@@ -241,7 +242,7 @@ namespace Vostok.ClusterConfig.Client
 
                 var budget = TimeBudget.StartNew(settings.UpdatePeriod);
 
-                if (protocol != ClusterConfigProtocolVersion.V3)
+                if (protocol < ClusterConfigProtocolVersion.V3)
                     subtreesObservingState.TryAddSubtree(new ClusterConfigPath(""), out _, out _);
                 var observingSubtrees = subtreesObservingState.GetSubtreesToRequest();
 
@@ -261,11 +262,15 @@ namespace Vostok.ClusterConfig.Client
                     }
 
                     if (currentState == null || localUpdateResult.Changed || remoteUpdateResult.Changed)
-                        PropagateNewState(CreateNewState(currentState, localUpdateResult, remoteUpdateResult), observingSubtrees, cancellationToken);
+                    {
+                        var newState = CreateNewState(currentState, localUpdateResult, remoteUpdateResult);
+                        var rootObservablePropagationTask = PropagateNewState(newState, observingSubtrees, cancellationToken);
+                        
+                        //(deniaa): We could make a version for each subtree and change it only if content have changed.
+                        //(deniaa): So as not to do useless changes of unchanged subtree if zone has changed elsewhere.
+                        subtreesObservingState.FinalizeSubtrees(observingSubtrees, remoteUpdateResult.Version, rootObservablePropagationTask, cancellationToken);
+                    }
 
-                    //(deniaa): We could make a version for each subtree and change it only if content have changed.
-                    //(deniaa): So as not to do useless changes of unchanged subtree if zone has changed elsewhere.
-                    subtreesObservingState.FinalizeSubtrees(observingSubtrees, remoteUpdateResult.Version, stateObservable);
 
                     lastLocalResult = localUpdateResult;
                     lastRemoteResult = remoteUpdateResult;
@@ -277,11 +282,12 @@ namespace Vostok.ClusterConfig.Client
 
                     log.Warn(error, "Periodical settings update has failed.");
 
+                    error = new ClusterConfigClientException("Failure in initial settings update.", error);
+                    var errorPropagatingTask = Task.CompletedTask;
                     if (currentState == null)
-                        PropagateError(new ClusterConfigClientException("Failure in initial settings update.", error), false);
-
+                        errorPropagatingTask = PropagateError(error, false);
                     if (observingSubtrees != null)
-                        subtreesObservingState.FinalizeSubtrees(observingSubtrees, null, stateObservable);
+                        subtreesObservingState.FailUnfinalizedSubtrees(observingSubtrees, error, errorPropagatingTask);
                 }
 
                 await Task.WhenAny(Task.Delay(budget.Remaining, cancellationToken), immediatelyUpdateCompletionSource.Task).ConfigureAwait(false);
@@ -345,7 +351,7 @@ namespace Vostok.ClusterConfig.Client
             return new ClusterConfigClientState(newLocalTree, newRemoteSubtrees, newCaches, newVersion);
         }
 
-        private void PropagateNewState(
+        private Task<CachingObservable<ClusterConfigClientState>> PropagateNewState(
             [NotNull] ClusterConfigClientState state, 
             List<ObservingSubtree> observingSubtrees, 
             CancellationToken cancellationToken)
@@ -354,7 +360,11 @@ namespace Vostok.ClusterConfig.Client
             {
                 // (iloktionov): No point in overwriting ObjectDisposedException stored in 'stateSource' in case the client was disposed.
                 if (cancellationToken.IsCancellationRequested)
-                    return;
+                {
+                    var faultedObs = new CachingObservable<ClusterConfigClientState>();
+                    faultedObs.Error(new ObjectDisposedException(GetType().Name));
+                    return Task.FromResult(faultedObs);
+                }
 
                 var newStateSource = new TaskCompletionSource<ClusterConfigClientState>(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -364,7 +374,7 @@ namespace Vostok.ClusterConfig.Client
             }
 
             // (iloktionov): External observers may take indefinitely long to call, so it's best to offload their callbacks to ThreadPool:
-            Task.Run(
+            return Task.Run(
                 () =>
                 {
                     // (iloktionov): Ref check on the state under lock prevents reordering of async observer notifications.
@@ -373,24 +383,21 @@ namespace Vostok.ClusterConfig.Client
                     {
                         // (iloktionov): 'stateObservable' might have been already completed by failed initial update iteration. In that case it has to be created from scratch:
                         if (stateObservable.IsCompleted)
-                        {
                             stateObservable = new CachingObservable<ClusterConfigClientState>();
-
-                            foreach (var observingSubtree in observingSubtrees)
-                                observingSubtree.RefreshObservable(stateObservable);
-                        }
 
                         if (ReferenceEquals(state, GetCurrentState()))
                             stateObservable.Next(state);
+                        
+                        return stateObservable;
                     }
                 });
         }
 
-        private void PropagateError([NotNull] Exception error, bool alwaysPushToObservable)
+        private Task PropagateError([NotNull] Exception error, bool alwaysPushToObservable)
         {
             var pushedToSource = stateSource.TrySetException(error);
             if (pushedToSource || alwaysPushToObservable)
-                Task.Run(() =>
+                return Task.Run(() =>
                 {
                     lock (observablePropagationLock)
                     {
@@ -398,6 +405,8 @@ namespace Vostok.ClusterConfig.Client
                             stateObservable.Error(error);
                     }
                 });
+
+            return Task.CompletedTask;
         }
 
         // ReSharper disable InconsistentNaming
