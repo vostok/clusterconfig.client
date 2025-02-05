@@ -25,7 +25,6 @@ notests *default:
 
 full-build > notests:
   deps:
-    - vostok.devtools
     - vostok.logging.console
     - vostok.commons.testing/src
 
