@@ -142,7 +142,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         {
             request = context.Request;
 
-            if (request.Url!.AbsolutePath == "/_v3_1/subtrees")
+            if (request.Url!.AbsolutePath == "/_v3_1/subtrees" || request.Url!.AbsolutePath == "/_v3/subtrees")
             {
                 await RespondV3(context);
             }
@@ -261,12 +261,13 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         {
             var writer = new BinaryBufferWriter(64);
 
-            protocol.GetSerializer(new RecyclingBoundedCache<string, string>(4)).Serialize(tree, writer);
+            var serializationProtocol = recommendedProtocol ?? protocol;
+            serializationProtocol.GetSerializer(new RecyclingBoundedCache<string, string>(4)).Serialize(tree, writer);
 
             hash = writer.Buffer.GetSha256Str(0, writer.Length);
 
             var map = new Dictionary<string, ArraySegment<byte>>();
-            if (protocol != ClusterConfigProtocolVersion.V1)
+            if (serializationProtocol > ClusterConfigProtocolVersion.V2)
             {
                 var buffer = new byte[writer.Length];
                 Buffer.BlockCopy(writer.Buffer, 0, buffer, 0, writer.Length);

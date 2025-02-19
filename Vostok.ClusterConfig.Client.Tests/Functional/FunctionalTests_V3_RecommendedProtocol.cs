@@ -15,8 +15,6 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional;
 internal class FunctionalTests_V3_RecommendedProtocol
 {
     private TestServer server;
-    private TestObserver<(ISettingsNode, long)> observer;
-
     private ClusterConfigClientSettings settings;
     private ClusterConfigClient client;
 
@@ -30,10 +28,10 @@ internal class FunctionalTests_V3_RecommendedProtocol
     [SetUp]
     public void TestSetup()
     {
-        server = new TestServer(ClusterConfigProtocolVersion.V3_1);
+        var defaultServerProtocol = ClusterConfigProtocolVersion.V3_1;
+        server = new TestServer(defaultServerProtocol);
         server.Start();
-
-        observer = new TestObserver<(ISettingsNode, long)>();
+        server.SetRecommendedProtocol(defaultServerProtocol);
 
         log = Substitute.For<ILog>();
         log.IsEnabledFor(Arg.Any<LogLevel>()).ReturnsForAnyArgs(true);
@@ -81,7 +79,6 @@ internal class FunctionalTests_V3_RecommendedProtocol
         version2 = version1 + 2.Minutes();
     }
 
-    [TestCase(ClusterConfigProtocolVersion.V1)]
     [TestCase(ClusterConfigProtocolVersion.V2)]
     [TestCase(ClusterConfigProtocolVersion.V3)]
     [TestCase(ClusterConfigProtocolVersion.V3_1)]
@@ -92,7 +89,7 @@ internal class FunctionalTests_V3_RecommendedProtocol
         client.Get("foo").Should().Be(remoteTree1["foo"]);
 
         server.SetRecommendedProtocol(protocol);
-        //(deniaa) This request forces V3 protocol to go to the server and received a new recommended protocol. 
+        //(deniaa) This request forces ClusterConfigClient.DefaultProtocol protocol to go to the server and received a new recommended protocol. 
         client.Get("bac").Should().Be(remoteTree1["bac"]);
             
         server.SetResponse(remoteTree2, version2);
