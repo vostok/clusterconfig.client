@@ -1,3 +1,7 @@
+## 0.2.30 (19-02-2025):
+
+V3_1 protocol (see changes for 0.2.23) is now used by default.
+
 ## 0.2.29 (31-01-2025):
 
 Fix a race between two Tasks: one from first initial observable subscribing and second from propagating new state for just subscribed observers.
