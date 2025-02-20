@@ -25,7 +25,7 @@ namespace Vostok.ClusterConfig.Client
     [PublicAPI]
     public class ClusterConfigClient : IClusterConfigClient, IDisposable
     {
-        private static readonly ClusterConfigProtocolVersion DefaultProtocol = ClusterConfigProtocolVersion.V3_1;
+        private static readonly ClusterConfigProtocolVersion DefaultProtocol = ClusterConfigProtocolVersion.V2;
         
         private readonly ClusterConfigClientSettings settings;
         private readonly CancellationTokenSource cancellationSource;
