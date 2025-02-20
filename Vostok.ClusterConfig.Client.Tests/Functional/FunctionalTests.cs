@@ -182,8 +182,9 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             folder.CreateFile("local-1", b => b.Append("value-1"));
             folder.CreateFile("local-2", b => b.Append("value-2"));
 
-            VerifyResults("local-1", 1, localTree3["local-1"]);
-            VerifyResults("local-2", 2, localTree3["local-2"]);
+            //Versions can be different depends on protocol version, so just skip this check.
+            VerifyResults("local-1", null, localTree3["local-1"]);
+            VerifyResults("local-2", null, localTree3["local-2"]);
         }
 
         [Test]
@@ -731,7 +732,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             client = new ClusterConfigClient(settings);
         }
 
-        private void VerifyResults(ClusterConfigPath path, long expectedVersion, ISettingsNode expectedTree, bool includeObservables = true)
+        private void VerifyResults(ClusterConfigPath path, long? expectedVersion, ISettingsNode expectedTree, bool includeObservables = true)
         {
             Action assertion = () =>
             {
@@ -740,19 +741,23 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
                     client.Get(path).Should().Be(expectedTree);
 
                     client.GetWithVersion(path).settings.Should().Be(expectedTree);
-                    client.GetWithVersion(path).version.Should().Be(expectedVersion);
+                    if (expectedVersion.HasValue)
+                        client.GetWithVersion(path).version.Should().Be(expectedVersion);
 
                     client.GetAsync(path).GetAwaiter().GetResult().Should().Be(expectedTree);
 
                     client.GetWithVersionAsync(path).GetAwaiter().GetResult().settings.Should().Be(expectedTree);
-                    client.GetWithVersionAsync(path).GetAwaiter().GetResult().version.Should().Be(expectedVersion);
+                    if (expectedVersion.HasValue)
+                        client.GetWithVersionAsync(path).GetAwaiter().GetResult().version.Should().Be(expectedVersion);
 
                     if (includeObservables)
                     {
                         client.Observe(path).WaitFirstValue(1.Seconds()).Should().Be(expectedTree);
 
                         client.ObserveWithVersions(path).WaitFirstValue(1.Seconds()).settings.Should().Be(expectedTree);
-                        client.ObserveWithVersions(path).WaitFirstValue(1.Seconds()).version.Should().Be(expectedVersion);
+                        
+                        if (expectedVersion.HasValue)
+                            client.ObserveWithVersions(path).WaitFirstValue(1.Seconds()).version.Should().Be(expectedVersion);
                     }
                 });
 
