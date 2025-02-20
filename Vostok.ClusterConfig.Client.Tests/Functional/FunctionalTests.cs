@@ -43,6 +43,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         private ISettingsNode remoteTree2;
         private ISettingsNode localTree1;
         private ISettingsNode localTree2;
+        private ISettingsNode localTree3;
 
         private DateTime version1;
         private DateTime version2;
@@ -123,6 +124,22 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
                         }),
                 });
 
+            localTree3 = new ObjectNode(
+                null,
+                new ISettingsNode[]
+                {
+                    new ObjectNode("local-1",
+                        new ISettingsNode[]
+                        {
+                            new ValueNode(string.Empty, "value-1")
+                        }),
+                    new ObjectNode("local-2",
+                        new ISettingsNode[]
+                        {
+                            new ValueNode(string.Empty, "value-2")
+                        }),
+                });
+            
             version1 = new DateTime(1990, 12, 1, 13, 5, 45);
             version2 = version1 + 2.Minutes();
         }
@@ -144,6 +161,29 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 
             VerifyResults(default, 1, localTree1);
             VerifyResults("local", 1, localTree1["local"]);
+        }
+
+        [Test]
+        public void Should_receive_local_tree_settings_for_different_subtrees_when_server_settings_are_disabled()
+        {
+            ModifySettings(s => s.EnableClusterSettings = false);
+
+            folder.CreateFile("local-1", b => b.Append("value-1"));
+            folder.CreateFile("local-2", b => b.Append("value-2"));
+
+            VerifyResults("local-1", 1, localTree3["local-1"]);
+            VerifyResults("local-2", 1, localTree3["local-2"]);
+        }
+
+        [Test]
+        public void Should_receive_local_tree_settings_for_different_subtrees_when_server_settings_are_enabled_but_useless()
+        {
+            server.SetResponse(remoteTree1, version1);
+            folder.CreateFile("local-1", b => b.Append("value-1"));
+            folder.CreateFile("local-2", b => b.Append("value-2"));
+
+            VerifyResults("local-1", 1, localTree3["local-1"]);
+            VerifyResults("local-2", 2, localTree3["local-2"]);
         }
 
         [Test]
