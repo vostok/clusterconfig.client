@@ -269,6 +269,8 @@ namespace Vostok.ClusterConfig.Client
                     }
                     else
                     {
+                        //(deniaa): If nothing changed, but all updates ends successfully, we still have to finalize all waiters.
+                        //(deniaa): It is necessary for the case when only local updater is enabled (and remote is disabled): nothing changes in local settings, nothing changed in "remote" one, but the entire tree from local settings is ready. 
                         rootObservablePropagationTask = Task.FromResult(stateObservable);
                     }
 
