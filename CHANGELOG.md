@@ -1,3 +1,7 @@
+## 0.2.31 (21-02-2025):
+
+Fixes a hung when remote settings are disabled.
+
 ## 0.2.30 (19-02-2025):
 
 V3_1 protocol (see changes for 0.2.23) is now used by default.
