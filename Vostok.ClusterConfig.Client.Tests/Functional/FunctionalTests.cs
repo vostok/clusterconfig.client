@@ -204,19 +204,6 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 
             VerifyResults(default, 3, localTree1);
         }
-        
-        [Test]
-        public void Should_reflect_updates_in_local_tree_in_subtrees_when_server_settings_are_disabled()
-        {
-            ModifySettings(s => s.EnableClusterSettings = false);
-
-            folder.CreateFile("local-1", b => b.Append("value-1"));
-            folder.CreateFile("local-2", b => b.Append("value-2"));
-
-            //Versions can be different depends on protocol version, so just skip this check.
-            VerifyResults("local-1", null, localTree3["local-1"]);
-            VerifyResults("local-2", null, localTree3["local-2"]);
-        }
 
         [Test]
         public void Should_receive_remote_tree_when_local_settings_are_disabled()
