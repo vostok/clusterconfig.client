@@ -159,8 +159,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 
             folder.CreateFile("local", b => b.Append("value-1"));
 
-            VerifyResults(default, 1, localTree1);
             VerifyResults("local", 1, localTree1["local"]);
+            VerifyResults(default, 1, localTree1);
         }
 
         [Test]
@@ -204,6 +204,19 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 
             VerifyResults(default, 3, localTree1);
         }
+        
+        [Test]
+        public void Should_reflect_updates_in_local_tree_in_subtrees_when_server_settings_are_disabled()
+        {
+            ModifySettings(s => s.EnableClusterSettings = false);
+
+            folder.CreateFile("local-1", b => b.Append("value-1"));
+            folder.CreateFile("local-2", b => b.Append("value-2"));
+
+            //Versions can be different depends on protocol version, so just skip this check.
+            VerifyResults("local-1", null, localTree3["local-1"]);
+            VerifyResults("local-2", null, localTree3["local-2"]);
+        }
 
         [Test]
         public void Should_receive_remote_tree_when_local_settings_are_disabled()
@@ -214,8 +227,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 
             server.SetResponse(remoteTree1, version1);
 
-            VerifyResults(default, version1.Ticks, remoteTree1);
             VerifyResults("foo", version1.Ticks, remoteTree1["foo"]);
+            VerifyResults(default, version1.Ticks, remoteTree1);
         }
 
         [Test]
@@ -227,13 +240,13 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 
             server.SetResponse(remoteTree1, version1);
 
-            VerifyResults(default, version1.Ticks, remoteTree1);
             VerifyResults("foo", version1.Ticks, remoteTree1["foo"]);
+            VerifyResults(default, version1.Ticks, remoteTree1);
 
             server.SetResponse(remoteTree2, version2);
 
-            VerifyResults(default, version2.Ticks, remoteTree2);
             VerifyResults("foo", version2.Ticks, remoteTree2["foo"]);
+            VerifyResults(default, version2.Ticks, remoteTree2);
         }
 
         [Test]
@@ -277,8 +290,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
                 s.EnableClusterSettings = false;
             });
 
-            VerifyResults(default, 1, null);
             VerifyResults("foo/bar", 1, null);
+            VerifyResults(default, 1, null);
         }
 
         [Test]
