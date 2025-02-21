@@ -43,6 +43,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
         private ISettingsNode remoteTree2;
         private ISettingsNode localTree1;
         private ISettingsNode localTree2;
+        private ISettingsNode localTree3;
 
         private DateTime version1;
         private DateTime version2;
@@ -123,6 +124,22 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
                         }),
                 });
 
+            localTree3 = new ObjectNode(
+                null,
+                new ISettingsNode[]
+                {
+                    new ObjectNode("local-1",
+                        new ISettingsNode[]
+                        {
+                            new ValueNode(string.Empty, "value-1")
+                        }),
+                    new ObjectNode("local-2",
+                        new ISettingsNode[]
+                        {
+                            new ValueNode(string.Empty, "value-2")
+                        }),
+                });
+            
             version1 = new DateTime(1990, 12, 1, 13, 5, 45);
             version2 = version1 + 2.Minutes();
         }
@@ -142,8 +159,32 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 
             folder.CreateFile("local", b => b.Append("value-1"));
 
-            VerifyResults(default, 1, localTree1);
             VerifyResults("local", 1, localTree1["local"]);
+            VerifyResults(default, 1, localTree1);
+        }
+
+        [Test]
+        public void Should_receive_local_tree_settings_for_different_subtrees_when_server_settings_are_disabled()
+        {
+            ModifySettings(s => s.EnableClusterSettings = false);
+
+            folder.CreateFile("local-1", b => b.Append("value-1"));
+            folder.CreateFile("local-2", b => b.Append("value-2"));
+
+            VerifyResults("local-1", 1, localTree3["local-1"]);
+            VerifyResults("local-2", 1, localTree3["local-2"]);
+        }
+
+        [Test]
+        public void Should_receive_local_tree_settings_for_different_subtrees_when_server_settings_are_enabled_but_useless()
+        {
+            server.SetResponse(remoteTree1, version1);
+            folder.CreateFile("local-1", b => b.Append("value-1"));
+            folder.CreateFile("local-2", b => b.Append("value-2"));
+
+            //Versions can be different depends on protocol version, so just skip this check.
+            VerifyResults("local-1", null, localTree3["local-1"]);
+            VerifyResults("local-2", null, localTree3["local-2"]);
         }
 
         [Test]
@@ -173,8 +214,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 
             server.SetResponse(remoteTree1, version1);
 
-            VerifyResults(default, version1.Ticks, remoteTree1);
             VerifyResults("foo", version1.Ticks, remoteTree1["foo"]);
+            VerifyResults(default, version1.Ticks, remoteTree1);
         }
 
         [Test]
@@ -186,13 +227,13 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
 
             server.SetResponse(remoteTree1, version1);
 
-            VerifyResults(default, version1.Ticks, remoteTree1);
             VerifyResults("foo", version1.Ticks, remoteTree1["foo"]);
+            VerifyResults(default, version1.Ticks, remoteTree1);
 
             server.SetResponse(remoteTree2, version2);
 
-            VerifyResults(default, version2.Ticks, remoteTree2);
             VerifyResults("foo", version2.Ticks, remoteTree2["foo"]);
+            VerifyResults(default, version2.Ticks, remoteTree2);
         }
 
         [Test]
@@ -236,8 +277,8 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
                 s.EnableClusterSettings = false;
             });
 
-            VerifyResults(default, 1, null);
             VerifyResults("foo/bar", 1, null);
+            VerifyResults(default, 1, null);
         }
 
         [Test]
@@ -691,7 +732,7 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
             client = new ClusterConfigClient(settings);
         }
 
-        private void VerifyResults(ClusterConfigPath path, long expectedVersion, ISettingsNode expectedTree, bool includeObservables = true)
+        private void VerifyResults(ClusterConfigPath path, long? expectedVersion, ISettingsNode expectedTree, bool includeObservables = true)
         {
             Action assertion = () =>
             {
@@ -700,19 +741,23 @@ namespace Vostok.ClusterConfig.Client.Tests.Functional
                     client.Get(path).Should().Be(expectedTree);
 
                     client.GetWithVersion(path).settings.Should().Be(expectedTree);
-                    client.GetWithVersion(path).version.Should().Be(expectedVersion);
+                    if (expectedVersion.HasValue)
+                        client.GetWithVersion(path).version.Should().Be(expectedVersion);
 
                     client.GetAsync(path).GetAwaiter().GetResult().Should().Be(expectedTree);
 
                     client.GetWithVersionAsync(path).GetAwaiter().GetResult().settings.Should().Be(expectedTree);
-                    client.GetWithVersionAsync(path).GetAwaiter().GetResult().version.Should().Be(expectedVersion);
+                    if (expectedVersion.HasValue)
+                        client.GetWithVersionAsync(path).GetAwaiter().GetResult().version.Should().Be(expectedVersion);
 
                     if (includeObservables)
                     {
                         client.Observe(path).WaitFirstValue(1.Seconds()).Should().Be(expectedTree);
 
                         client.ObserveWithVersions(path).WaitFirstValue(1.Seconds()).settings.Should().Be(expectedTree);
-                        client.ObserveWithVersions(path).WaitFirstValue(1.Seconds()).version.Should().Be(expectedVersion);
+                        
+                        if (expectedVersion.HasValue)
+                            client.ObserveWithVersions(path).WaitFirstValue(1.Seconds()).version.Should().Be(expectedVersion);
                     }
                 });
 

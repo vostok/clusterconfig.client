@@ -261,15 +261,22 @@ namespace Vostok.ClusterConfig.Client
                         }
                     }
 
+                    Task<CachingObservable<ClusterConfigClientState>> rootObservablePropagationTask;
                     if (currentState == null || localUpdateResult.Changed || remoteUpdateResult.Changed)
                     {
                         var newState = CreateNewState(currentState, localUpdateResult, remoteUpdateResult);
-                        var rootObservablePropagationTask = PropagateNewState(newState, observingSubtrees, cancellationToken);
-                        
-                        //(deniaa): We could make a version for each subtree and change it only if content have changed.
-                        //(deniaa): So as not to do useless changes of unchanged subtree if zone has changed elsewhere.
-                        subtreesObservingState.FinalizeSubtrees(observingSubtrees, remoteUpdateResult.Version, rootObservablePropagationTask, cancellationToken);
+                        rootObservablePropagationTask = PropagateNewState(newState, observingSubtrees, cancellationToken);
                     }
+                    else
+                    {
+                        //(deniaa): If nothing changed, but all updates ends successfully, we still have to finalize all waiters.
+                        //(deniaa): It is necessary for the case when only local updater is enabled (and remote is disabled): nothing changes in local settings, nothing changed in "remote" one, but the entire tree from local settings is ready. 
+                        rootObservablePropagationTask = Task.FromResult(stateObservable);
+                    }
+
+                    //(deniaa): We could make a version for each subtree and change it only if content have changed.
+                    //(deniaa): So as not to do useless changes of unchanged subtree if zone has changed elsewhere.
+                    subtreesObservingState.FinalizeSubtrees(observingSubtrees, remoteUpdateResult.Version, rootObservablePropagationTask, cancellationToken);
 
 
                     lastLocalResult = localUpdateResult;
