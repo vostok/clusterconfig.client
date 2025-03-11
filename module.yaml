@@ -8,6 +8,22 @@ notests *default:
   install:
     - Vostok.ClusterConfig.Client/bin/Release/netstandard2.0/Vostok.ClusterConfig.Client.dll
     - module vostok.clusterconfig.client.abstractions
+    - groups:
+        - target-framework: "netstandard2.0"
+          libraries:
+            - Vostok.ClusterConfig.Client/bin/Release/netstandard2.0/Vostok.ClusterConfig.Client.dll
+          modules:
+            - name: vostok.clusterconfig.client.abstractions
+        - target-framework: "net6.0"
+          libraries:
+            - Vostok.ClusterConfig.Client/bin/Release/net6.0/Vostok.ClusterConfig.Client.dll
+          modules:
+            - name: vostok.clusterconfig.client.abstractions
+        - target-framework: "net8.0"
+          libraries:
+            - Vostok.ClusterConfig.Client/bin/Release/net8.0/Vostok.ClusterConfig.Client.dll
+          modules:
+            - name: vostok.clusterconfig.client.abstractions
 
   deps:
     - vostok.devtools
@@ -27,6 +43,26 @@ full-build > notests:
   deps:
     - vostok.logging.console
     - vostok.commons.testing/src
+
+  install:
+    - Vostok.ClusterConfig.Client/bin/Release/netstandard2.0/Vostok.ClusterConfig.Client.dll
+    - module vostok.clusterconfig.client.abstractions
+    - groups:
+        - target-framework: "netstandard2.0"
+          libraries:
+            - Vostok.ClusterConfig.Client/bin/Release/netstandard2.0/Vostok.ClusterConfig.Client.dll
+          modules:
+            - name: vostok.clusterconfig.client.abstractions
+        - target-framework: "net6.0"
+          libraries:
+            - Vostok.ClusterConfig.Client/bin/Release/net6.0/Vostok.ClusterConfig.Client.dll
+          modules:
+            - name: vostok.clusterconfig.client.abstractions
+        - target-framework: "net8.0"
+          libraries:
+            - Vostok.ClusterConfig.Client/bin/Release/net8.0/Vostok.ClusterConfig.Client.dll
+          modules:
+            - name: vostok.clusterconfig.client.abstractions
 
   build:
     target: Vostok.ClusterConfig.Client.sln
