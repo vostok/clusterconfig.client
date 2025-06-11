@@ -1,3 +1,7 @@
+## 0.2.32 (11-06-2025):
+
+Reduce amount of INFO logs when nothing has changed on ClusterConfig server side
+
 ## 0.2.31 (21-02-2025):
 
 Fixes a hung when remote settings are disabled.
