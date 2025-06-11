@@ -310,7 +310,8 @@ namespace Vostok.ClusterConfig.Client.Updaters
                 var haveAnyModifiedSubtree = deserializedSubtrees.Any(s => s.Value.WasModified);
                 var treesSize = remoteSubtrees.Subtrees.Sum(x => x.Value?.Size ?? 0);
 
-                LogReceivedNewSubtrees(treesSize, responseContent.Count, version, replica, protocol, responsesDescriptions);
+                LogReceivedNewSubtreesIfNeeded(treesSize, responseContent.Count, version, replica, protocol, responsesDescriptions, haveAnyModifiedSubtree);
+                
                 return new RemoteUpdateResult(haveAnyModifiedSubtree, haveAnyModifiedSubtree ? remoteSubtrees : lastResult.Subtrees, description, protocol, version, recommendedProtocol, null);
             }
             else
@@ -473,9 +474,31 @@ namespace Vostok.ClusterConfig.Client.Updaters
             => log.Info("Received new version of zone '{Zone}' from {Replica}. Size = {Size}. Version = {Version}. Protocol = {Protocol}. Patch = {IsPatch}. {ResponsesDescriptions}.", 
                 zone, replica?.Authority, treeSize, version.ToString("R"), protocol.ToString(), patch, responsesDescriptions);
         
-        private void LogReceivedNewSubtrees(int treesSize, int responseSize, DateTime version, Uri replica, ClusterConfigProtocolVersion protocol, string responsesDescriptions)
-            => log.Info("Received new subtrees from '{Zone}' from {Replica}. Response size = {ResponseSize}. New settings size = {SettingsSize}. Version = {Version}. Protocol = {Protocol}. {ResponsesDescriptions}.", 
-                zone, replica?.Authority, responseSize, treesSize, version.ToString("R"), protocol.ToString(), responsesDescriptions);
+        private void LogReceivedNewSubtreesIfNeeded(int treesSize, int responseSize, DateTime version, Uri replica, ClusterConfigProtocolVersion protocol, string responsesDescriptions, bool haveAnyModifiedSubtree)
+        {
+            if (haveAnyModifiedSubtree)
+            {
+                log.Info("Received new subtrees from '{Zone}' from {Replica}. Response size = {ResponseSize}. New settings size = {SettingsSize}. Version = {Version}. Protocol = {Protocol}. {ResponsesDescriptions}.",
+                    zone,
+                    replica?.Authority,
+                    responseSize,
+                    treesSize,
+                    version.ToString("R"),
+                    protocol.ToString(),
+                    responsesDescriptions);
+            }
+            else
+            {
+                log.Debug("Response from '{Zone}' from {Replica} indicates that subtrees have not been modified. Response size = {ResponseSize}. Settings size = {SettingsSize}. Version = {Version}. Protocol = {Protocol}. {ResponsesDescriptions}.",
+                    zone,
+                    replica?.Authority,
+                    responseSize,
+                    treesSize,
+                    version.ToString("R"),
+                    protocol.ToString(),
+                    responsesDescriptions);
+            }
+        }
 
         #endregion
 
