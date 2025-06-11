@@ -489,7 +489,7 @@ namespace Vostok.ClusterConfig.Client.Updaters
             }
             else
             {
-                log.Debug("Received not modified subtrees from '{Zone}' from {Replica}. Response size = {ResponseSize}. Settings size = {SettingsSize}. Version = {Version}. Protocol = {Protocol}. {ResponsesDescriptions}.",
+                log.Debug("Response from '{Zone}' from {Replica} indicates that subtrees have not been modified. Response size = {ResponseSize}. Settings size = {SettingsSize}. Version = {Version}. Protocol = {Protocol}. {ResponsesDescriptions}.",
                     zone,
                     replica?.Authority,
                     responseSize,
